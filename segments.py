@@ -104,3 +104,39 @@ def pca_on_au_features(df):
     from sklearn.decomposition import PCA
     pca = PCA(n_components=4)
     return pca.fit_transform(np.array(b))
+
+from videos import *
+if __name__ == "__main__":
+    video_basename = "simple_test.mp4"
+    video_name = "videos/" + video_basename
+    df = extract_features(video_name)
+    # z = play(video_path)
+
+    # c = pca_on_au_features(df)
+
+    # plot_au_over_time(df, 25, 1041)
+
+    # todo: make a for loop to graph all the au's
+    df2 = df.iloc[4000:6000,]
+    for au in au_list:
+        # plot_au_over_time(df, au, 20)
+        plot_au_over_time(df2, au, rolling_mean_window=50)
+        # kinda like the bigger windows for not catching spikes
+    logic_on_au_features(df2)
+    interestings = df2['interesting_segments'][df2['interesting_segments']==True].index
+    # https://stackoverflow.com/questions/2361945/detecting-consecutive-integers-in-a-list
+
+    from itertools import groupby
+    from operator import itemgetter
+    segments = []
+    for k, g in groupby(enumerate(interestings), lambda ix : ix[0] - ix[1]):
+        segments.append(list(map(itemgetter(1), g)))
+
+    seglens = [len(x) for x in segments]
+    # maybe if len less than 50, it's just noise
+    for seg in segments:
+        print(seg[0], seg[-1])
+        play(video_name, seg[0], seg[-1])
+
+    df2.to_csv()
+    # replacing larger signal values to get a better idea of the main curve
