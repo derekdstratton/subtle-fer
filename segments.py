@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def extract_features(video_path):
-    csv_from_video_path = "processed/" + video_path.split('.')[0] + ".csv"
+    base_path = os.path.basename(video_path)
+    csv_from_video_path = "processed/" + base_path.split('.')[0] + ".csv"
     if not os.path.isfile(csv_from_video_path):
         openface_build_path = "/mnt/c/Users/derek/PycharmProjects/OpenFace/build/bin"
 
@@ -116,8 +117,8 @@ if __name__ == "__main__":
 
     # plot_au_over_time(df, 25, 1041)
 
-    # todo: make a for loop to graph all the au's
-    df2 = df.iloc[4000:6000,]
+    # df2 = df.iloc[4000:6000,]
+    df2 = df
     for au in au_list:
         # plot_au_over_time(df, au, 20)
         plot_au_over_time(df2, au, rolling_mean_window=50)
@@ -129,14 +130,19 @@ if __name__ == "__main__":
     from itertools import groupby
     from operator import itemgetter
     segments = []
+    # look for consecutive chains of true
     for k, g in groupby(enumerate(interestings), lambda ix : ix[0] - ix[1]):
         segments.append(list(map(itemgetter(1), g)))
 
     seglens = [len(x) for x in segments]
     # maybe if len less than 50, it's just noise
+
+    data = []
     for seg in segments:
         print(seg[0], seg[-1])
-        play(video_name, seg[0], seg[-1])
+        data.append((seg[0], seg[-1], 0))
+        # play(video_name, seg[0], seg[-1])
 
-    df2.to_csv()
+    seg_df = pd.DataFrame(data, columns=['start_frame', 'end_frame', 'label'])
+    seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv")
     # replacing larger signal values to get a better idea of the main curve
