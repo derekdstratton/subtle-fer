@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 
 video_path = "videos/simple_test.mp4"
@@ -33,6 +35,9 @@ class VideoWindow(QMainWindow):
         self.positionSlider.setRange(0, 0)
         self.positionSlider.sliderMoved.connect(self.setPosition)
 
+        self.button = QPushButton('button', self)
+        self.button.clicked.connect(self.on_click)
+
         self.errorLabel = QLabel()
         self.errorLabel.setSizePolicy(QSizePolicy.Preferred,
                 QSizePolicy.Maximum)
@@ -65,6 +70,7 @@ class VideoWindow(QMainWindow):
         controlLayout.setContentsMargins(0, 0, 0, 0)
         controlLayout.addWidget(self.playButton)
         controlLayout.addWidget(self.positionSlider)
+        controlLayout.addWidget(self.button)
 
         layout = QVBoxLayout()
         layout.addWidget(videoWidget)
@@ -80,10 +86,19 @@ class VideoWindow(QMainWindow):
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
 
+        # open the media and segments
+        # needs an absolute path
+        self.mediaPlayer.setMedia(
+            QMediaContent(QUrl.fromLocalFile(os.path.abspath(video_path))))
+        self.playButton.setEnabled(True)
+
+        self.segment_counter = 0
+
+
     def openFile(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
                 QDir.homePath())
-
+        print(fileName)
         if fileName != '':
             self.mediaPlayer.setMedia(
                     QMediaContent(QUrl.fromLocalFile(fileName)))
@@ -118,6 +133,22 @@ class VideoWindow(QMainWindow):
     def handleError(self):
         self.playButton.setEnabled(False)
         self.errorLabel.setText("Error: " + self.mediaPlayer.errorString())
+
+    def on_click(self):
+        print('button hit')
+        startframe = segments['start_frame'][self.segment_counter]
+        endframe = segments['end_frame'][self.segment_counter]
+        # arg is milliseconds (assuming video is run at 30 fps)
+        frames_to_millisecs = startframe // 30 * 1000
+        self.mediaPlayer.setPosition(frames_to_millisecs)
+        self.mediaPlayer.play()
+        while self.mediaPlayer.position() * 30 // 1000 < endframe:
+            print(self.mediaPlayer.position() * 30 // 1000)
+        self.mediaPlayer.pause()
+
+        self.segment_counter = self.segment_counter + 1
+        if self.segment_counter >= len(segments):
+            self.segment_counter = 0
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
