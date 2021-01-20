@@ -35,7 +35,8 @@ and lets the user label which subtle expression matches the clip.
 1. set the environment variable OPENFACE_PATH to the path where you installed
 it. (By default it ends in `OpenFace/build/bin`)
    
-2. Run the script with the argument being the path of the video to find segments
+2. Run the script with the argument being the basename of the video to find segments.
+The video should be located in the `videos` subdirectory of this project.
 
 3. It will output the segment in the `segment_labels` directory. OpenFace also
 creates outputs in a `processed` directory. 

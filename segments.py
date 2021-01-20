@@ -6,10 +6,9 @@ import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 
-
+# takes a video file, and returns a dataframe with all the AUs
+# uses OpenFace to find the AUs. it will skip processing if it finds it's already been processed
 # https://github.com/TadasBaltrusaitis/OpenFace/wiki/Action-Units
-# this has important info, containing what datasets AU rec was
-# trained on, and that the multi rec tool may not be as good as 1
 def extract_features(video_path):
     base_path = os.path.basename(video_path)
     csv_from_video_path = "processed/" + base_path.split('.')[0] + ".csv"
@@ -23,8 +22,67 @@ def extract_features(video_path):
         subprocess.run([openface_build_path + "/FeatureExtraction", "-f", video_path])#, "-aus"])
     else:
         print("csv file already exists, loading into df")
-    return pd.read_csv(csv_from_video_path)
+    full_df = pd.read_csv(csv_from_video_path)
+    # num_frames x num_AUs dataframe containing the AU intensity for each video frame
+    # note: you can change the first slice here to look at a subset of video frames
+    # note: i'm currently removing au 45, it gave me worse results
+    return full_df.loc[:, 'AU01_r':'AU26_r']
 
+
+# segment finding method 1
+def find_where_rolling_mean_deviates_from_threshold(au_df):
+    # hyperparameters:
+    # rolling mean window and method (currently 50)
+    # threshold (currently median + 1 std)
+    # number of accepted au's (currently if any 1 deviates)
+
+    # num_frames x num_AUs dataframe, using a rolling average to attempt to smooth points
+    smoothed_au_df = au_df.rolling(50).mean()
+
+    # plots of the AUs are useful
+    for col in smoothed_au_df.columns:
+        plot_au(smoothed_au_df[col], col)
+
+    # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
+    au_deviants_df = pd.DataFrame()
+    for col in smoothed_au_df.columns:
+        threshold = smoothed_au_df[col].median() + smoothed_au_df[col].std()
+        au_deviants_df[col] = smoothed_au_df[col] > threshold
+
+    # num_frames boolean series if any of the AUs deviate
+    any_au_deviates = au_deviants_df.any(axis=1)
+
+    # plots where segments are based on if any au deviates from median
+    plot_segment_or_not(any_au_deviates)
+
+    seg_df = segment_or_not_to_dataframe(any_au_deviates, play_segs=True)
+    # output the resulting segments to file
+    # seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv")
+    return seg_df
+
+# segment finding method 2
+def find_segments_from_clusters():
+    pass
+
+# transforms a num_frames length bool series to a num_segments x 3 segments dataframe
+# play_segs will play the segments it finds if true
+def segment_or_not_to_dataframe(seg_or_not_series, play_segs=False):
+    # https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-consecutive-elements-in-a-numpy-array
+    def consecutive(data, stepsize=1):
+        return np.split(data, np.where(np.diff(data) != stepsize)[0] + 1)
+
+    list_of_segment_frames = consecutive(np.where(seg_or_not_series == True)[0])
+
+    data = []
+    if play_segs:
+        import videos
+
+    for seg in list_of_segment_frames:
+        data.append((seg[0], seg[-1], 0))
+        if play_segs:
+            videos.play(video_name, seg[0], seg[-1])
+
+    return pd.DataFrame(data, columns=['start_frame', 'end_frame', 'label'])
 
 def plot_au_over_time(df, au_num, rolling_mean_window=20):
     # plt.plot(df['frame'], df['AU' + f'{au_num:02}' + '_r'])
@@ -72,20 +130,37 @@ def pca_on_au_features(df, num_components=4):
     pca = PCA(n_components=num_components)
     return pca.fit_transform(np.array(b))
 
+def plot_segment_or_not(seg_or_not_series):
+    plt.plot(seg_or_not_series)
+    plt.xlabel("frame")
+    plt.ylabel("segment or not")
+    plt.show()
+
+
+def plot_au(au_series, au_name):
+    plt.plot(au_series, label=au_name)
+    plt.plot(np.full(len(au_series), au_series.median()), label="median")
+    plt.plot(np.full(len(au_series), au_series.median() + au_series.std()), label="median plus 1 std")
+    plt.xlabel("frame")
+    plt.ylabel(au_name)
+    plt.legend()
+    plt.show()
+
 
 if __name__ == "__main__":
+    # first argument should be the basename of the video
     video_basename = sys.argv[1]
-    # video_basename = "simple_test.mp4"
-    # video_basename = "Try_Not_To_Cringe_Challenge_By_AdikTheOne_Reaction.mp4"
-    # video_basename = "Psychic_Cringe_Fails_1_-_(HILARIOUS_REACTION).mp4"
-    # video_basename = "When_Among_Us_Arguments_Go_TOO_FAR_-_(Pokimane_&_Valkyrae_Rage).mp4"
     video_name = "videos/" + video_basename
-    df = extract_features(video_name)
-    # z = play(video_path)
 
-    # plot_au_over_time(df, 25, 1041)
+    # get the AU dataframe
+    au_df = extract_features(video_name)
 
-    # df2 = df.iloc[0:5000,]
+    # use this method to find segments
+    seg_df = find_where_rolling_mean_deviates_from_threshold(au_df)
+
+    exit()
+
+
     df2 = df
     au_list = [1, 2, 4, 5, 6, 7, 9, 10, 12, 14, 15, 17, 20, 23, 25, 26, 45]
     for au in au_list:
