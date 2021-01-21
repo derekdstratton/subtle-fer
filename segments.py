@@ -134,6 +134,11 @@ def summarize_segments(seg_df):
     return seg_lens
 
 
+def delete_segments_by_length(seg_df, smallest_len=20, largest_len=200):
+    seg_lens = (seg_df['end_frame'] - seg_df['start_frame']).astype('int32')
+    return seg_df[(seg_lens >= smallest_len) & (seg_lens <= largest_len)]
+
+
 def plot_segment_or_not(seg_or_not_series):
     plt.plot(seg_or_not_series)
     plt.xlabel("frame")
