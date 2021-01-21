@@ -6,6 +6,8 @@ import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 
+# todo: it would be nice to have options to toggle plots on/off, toggle playing videos on/off
+
 
 # takes a video file, and returns a dataframe with all the AUs
 # uses OpenFace to find the AUs. it will skip processing if it finds it's already been processed
@@ -42,7 +44,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
 
     # plots of the AUs are useful
     for col in smoothed_au_df.columns:
-        plot_au(smoothed_au_df[col], col)
+        plot_au(smoothed_au_df[col], col, "Smoothed AU Plot: " + col)
 
     # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
     au_deviants_df = pd.DataFrame()
@@ -56,7 +58,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(any_au_deviates)
 
-    return segment_or_not_to_dataframe(any_au_deviates, play_segs=True)
+    return segment_or_not_to_dataframe(any_au_deviates, play_segs=False)
 
 
 # segment finding method 2
@@ -96,7 +98,7 @@ def find_segments_from_clusters(au_df):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(not_in_most_common_group)
 
-    return segment_or_not_to_dataframe(not_in_most_common_group, play_segs=True)
+    return segment_or_not_to_dataframe(not_in_most_common_group, play_segs=False)
 
 
 # transforms a num_frames length bool series to a num_segments x 3 segments dataframe
@@ -120,19 +122,33 @@ def segment_or_not_to_dataframe(seg_or_not_series, play_segs=False):
     return pd.DataFrame(data, columns=['start_frame', 'end_frame', 'label'])
 
 
+def summarize_segments(seg_df):
+    binwidth = 5
+    seg_lens = (seg_df['end_frame'] - seg_df['start_frame']).astype('int32')
+    print(seg_lens.describe())
+    plt.hist(seg_lens, bins=range(min(seg_lens) - (min(seg_lens) % 5), max(seg_lens) + (max(seg_lens) % 5) + binwidth, binwidth))
+    plt.xlabel("Segment Length")
+    plt.ylabel("Number of Occurences")
+    plt.title("Histogram of Segment Lengths: Bins of Size 5")
+    plt.show()
+    return seg_lens
+
+
 def plot_segment_or_not(seg_or_not_series):
     plt.plot(seg_or_not_series)
     plt.xlabel("frame")
     plt.ylabel("segment or not")
+    plt.title("Detected Segments for each Frame")
     plt.show()
 
 
-def plot_au(au_series, au_name):
+def plot_au(au_series, au_name, title):
     plt.plot(au_series, label=au_name)
     plt.plot(np.full(len(au_series), au_series.median()), label="median")
     plt.plot(np.full(len(au_series), au_series.median() + au_series.std()), label="median plus 1 std")
     plt.xlabel("frame")
     plt.ylabel(au_name)
+    plt.title(title)
     plt.legend()
     plt.show()
 
@@ -141,6 +157,7 @@ def plot_groups(groups_series):
     plt.plot(groups_series)
     plt.xlabel("frame")
     plt.ylabel("group")
+    plt.title("Detected Groups for each Frame")
     plt.show()
 
 
@@ -155,6 +172,10 @@ if __name__ == "__main__":
     # get the AU dataframe
     au_df = extract_features(video_name)
 
+    # plotting the au's
+    # for col in au_df.columns:
+    #     plot_au(au_df[col], col, "AU Plot: " + col)
+
     if int(method_to_run) == 1:
         # method 1 for segments
         seg_df = find_where_rolling_mean_deviates_from_threshold(au_df)
@@ -162,5 +183,6 @@ if __name__ == "__main__":
         # method 2 for segments
         seg_df = find_segments_from_clusters(au_df)
 
+    seg_lens = summarize_segments(seg_df)
     # output the resulting segments to file
     # seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv")
