@@ -47,15 +47,16 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     # number of accepted au's (currently if any 1 deviates)
 
     # num_frames x num_AUs dataframe, using a rolling average to attempt to smooth points
+    # todo: finding a rolling average over frame jumps is not great if mia values
     smoothed_au_df = au_df.rolling(50, min_periods=1, center=True).mean()
 
     # plots of the AUs are useful
-    for col in smoothed_au_df.columns:
+    for col in smoothed_au_df.columns.drop('face_id').drop('frame'):
         plot_au(smoothed_au_df['frame'], smoothed_au_df[col], col, "Smoothed AU Plot: " + col)
 
     # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
     au_deviants_df = pd.DataFrame()
-    for col in smoothed_au_df.columns:
+    for col in smoothed_au_df.columns.drop('face_id').drop('frame'):
         threshold = smoothed_au_df[col].median() + smoothed_au_df[col].std()
         au_deviants_df[col] = smoothed_au_df[col] > threshold
 
@@ -63,9 +64,9 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     any_au_deviates = au_deviants_df.any(axis=1)
 
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(any_au_deviates)
+    plot_segment_or_not(smoothed_au_df['frame'], any_au_deviates)
 
-    return segment_or_not_to_dataframe(any_au_deviates, play_segs=False)
+    return segment_or_not_to_dataframe(smoothed_au_df['frame'], any_au_deviates, play_segs=True)
 
 
 # segment finding method 2
@@ -192,8 +193,8 @@ if __name__ == "__main__":
     au_df = extract_features(video_name)
 
     # plotting the au's
-    for col in au_df.columns:
-        plot_au(au_df['frame'], au_df[col], col, "AU Plot: " + col)
+    # for col in au_df.columns.drop('face_id').drop('frame'):
+    #     plot_au(au_df['frame'], au_df[col], col, "AU Plot: " + col)
 
     if int(method_to_run) == 1:
         # method 1 for segments
