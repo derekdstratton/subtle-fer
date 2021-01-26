@@ -28,7 +28,7 @@ def extract_features(video_path):
     full_df = pd.read_csv(csv_from_video_path)
     # num_frames x num_AUs dataframe containing the AU intensity for each video frame
     # note: you can change the first slice here to look at a subset of video frames
-    # note: i'm currently removing au 45, it gave me worse results
+    # note: i'm currently removing au 45 (blinking), it gave me worse results.
     return full_df.loc[:, 'AU01_r':'AU26_r']
 
 
@@ -40,7 +40,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     # number of accepted au's (currently if any 1 deviates)
 
     # num_frames x num_AUs dataframe, using a rolling average to attempt to smooth points
-    smoothed_au_df = au_df.rolling(50).mean()
+    smoothed_au_df = au_df.rolling(50, min_periods=1, center=True).mean()
 
     # plots of the AUs are useful
     for col in smoothed_au_df.columns:
@@ -65,7 +65,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
 def find_segments_from_clusters(au_df):
     # hyperparameters/adjustable things:
     # number of pca components (currently 8), and using this to reduce dimensionality
-    # the clustering method (currently agglomerative
+    # the clustering method (currently agglomerative)
     # distance_threshold for agglomerative or num_clusters for k means
     # method for determining useful groups (currently any group that isn't the main)
 
