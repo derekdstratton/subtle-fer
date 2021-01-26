@@ -26,15 +26,7 @@ class EmotionButton(QPushButton):
         # todo: this should save for the previous segment counted.
         self.vidWindow.segments['label'][self.vidWindow.segment_counter] = self.name
 
-        startframe = self.vidWindow.segments['start_frame'][self.vidWindow.segment_counter]
-        endframe = self.vidWindow.segments['end_frame'][self.vidWindow.segment_counter]
-        # arg is milliseconds (assuming video is run at 30 fps)
-        frames_to_millisecs = startframe // 30 * 1000
-        self.vidWindow.mediaPlayer.setPosition(frames_to_millisecs)
-        self.vidWindow.mediaPlayer.play()
-        while self.vidWindow.mediaPlayer.position() * 30 // 1000 < endframe:
-            print(self.vidWindow.mediaPlayer.position() * 30 // 1000)
-        self.vidWindow.mediaPlayer.pause()
+        self.vidWindow.playsegment(self.vidWindow.segment_counter)
 
         self.vidWindow.segment_counter = self.vidWindow.segment_counter + 1
         if self.vidWindow.segment_counter >= len(self.vidWindow.segments):
@@ -50,17 +42,19 @@ class VideoWindow(QMainWindow):
 
         videoWidget = QVideoWidget()
 
-        self.playButton = QPushButton()
-        self.playButton.setEnabled(False)
-        self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-        self.playButton.clicked.connect(self.play)
+        self.segment_counter = 0
+
+        # self.playButton = QPushButton()
+        # self.playButton.setEnabled(False)
+        # self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        # self.playButton.clicked.connect(self.play)
 
         self.positionSlider = QSlider(Qt.Horizontal)
         self.positionSlider.setRange(0, 0)
         self.positionSlider.sliderMoved.connect(self.setPosition)
 
-        self.button = QPushButton('button', self)
-        self.button.clicked.connect(self.on_click)
+        self.button = QPushButton('replay', self)
+        self.button.clicked.connect(lambda: self.playsegment(self.segment_counter))
 
         self.errorLabel = QLabel()
         self.errorLabel.setSizePolicy(QSizePolicy.Preferred,
@@ -93,7 +87,7 @@ class VideoWindow(QMainWindow):
         # Create layouts to place inside widget
         controlLayout = QHBoxLayout()
         controlLayout.setContentsMargins(0, 0, 0, 0)
-        controlLayout.addWidget(self.playButton)
+        # controlLayout.addWidget(self.playButton)
         controlLayout.addWidget(self.positionSlider)
         controlLayout.addWidget(self.button)
 
@@ -168,10 +162,10 @@ class VideoWindow(QMainWindow):
         # needs an absolute path
         self.mediaPlayer.setMedia(
             QMediaContent(QUrl.fromLocalFile(os.path.abspath(video_path))))
-        self.playButton.setEnabled(True)
+        # self.playButton.setEnabled(True)
 
-        self.segment_counter = 0
 
+        # self.playsegment(self.segment_counter)
         # todo: onstart it should play the first clip, so you can label it with a button press.
 
 
@@ -188,8 +182,11 @@ class VideoWindow(QMainWindow):
     def exitCall(self):
         print('saving on exit')
         # todo: make this path dynamic for whatevedr file
-        self.segments.to_csv("segment_labels/simple_test.csv")
+        self.segments.to_csv("segment_labels/simple_test.csv", index=False)
         sys.exit(app.exec_())
+
+    def closeEvent(self, a):
+        self.exitCall()
 
     def play(self):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
@@ -198,12 +195,13 @@ class VideoWindow(QMainWindow):
             self.mediaPlayer.play()
 
     def mediaStateChanged(self, state):
-        if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
-            self.playButton.setIcon(
-                    self.style().standardIcon(QStyle.SP_MediaPause))
-        else:
-            self.playButton.setIcon(
-                    self.style().standardIcon(QStyle.SP_MediaPlay))
+        # if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+        #     self.playButton.setIcon(
+        #             self.style().standardIcon(QStyle.SP_MediaPause))
+        # else:
+        #     self.playButton.setIcon(
+        #             self.style().standardIcon(QStyle.SP_MediaPlay))
+        pass
 
     def positionChanged(self, position):
         self.positionSlider.setValue(position)
@@ -218,6 +216,18 @@ class VideoWindow(QMainWindow):
         self.playButton.setEnabled(False)
         self.errorLabel.setText("Error: " + self.mediaPlayer.errorString())
 
+    def playsegment(self, index):
+        startframe = self.segments['start_frame'][index]
+        endframe = self.segments['end_frame'][index]
+        # arg is milliseconds (assuming video is run at 30 fps)
+        frames_to_millisecs = startframe // 30 * 1000
+        self.mediaPlayer.setPosition(frames_to_millisecs)
+        self.mediaPlayer.play()
+        while self.mediaPlayer.position() * 30 // 1000 < endframe:
+            print(self.mediaPlayer.position() * 30 // 1000)
+        self.mediaPlayer.pause()
+
+
     def on_click(self):
         print('button hit')
         startframe = self.segments['start_frame'][self.segment_counter]
@@ -229,10 +239,6 @@ class VideoWindow(QMainWindow):
         while self.mediaPlayer.position() * 30 // 1000 < endframe:
             print(self.mediaPlayer.position() * 30 // 1000)
         self.mediaPlayer.pause()
-
-        self.segment_counter = self.segment_counter + 1
-        if self.segment_counter >= len(self.segments):
-            self.segment_counter = 0
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
