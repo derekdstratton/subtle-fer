@@ -66,7 +66,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(smoothed_au_df['frame'], any_au_deviates)
 
-    return segment_or_not_to_dataframe(smoothed_au_df['frame'], any_au_deviates, play_segs=True)
+    return segment_or_not_to_dataframe(smoothed_au_df['frame'], any_au_deviates, play_segs=False)
 
 
 # segment finding method 2
@@ -106,7 +106,7 @@ def find_segments_from_clusters(au_df):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(au_df['frame'], not_in_most_common_group)
 
-    return segment_or_not_to_dataframe(au_df['frame'],not_in_most_common_group, play_segs=True)
+    return segment_or_not_to_dataframe(au_df['frame'],not_in_most_common_group, play_segs=False)
 
 
 # transforms a num_frames length bool series to a num_segments x 3 segments dataframe
@@ -123,13 +123,20 @@ def segment_or_not_to_dataframe(frame, seg_or_not_series, play_segs=False):
         import videos
 
     for seg in list_of_segment_frames:
-        startF = frame.iloc[seg[0]]
-        endF = frame.iloc[seg[-1]]
+        startF = int(frame.iloc[seg[0]])
+        endF = int(frame.iloc[seg[-1]])
         data.append((startF, endF, 0))
         if play_segs:
             videos.play(video_name, startF, endF)
 
     return pd.DataFrame(data, columns=['start_frame', 'end_frame', 'label'])
+
+
+def dataframe_to_seg_or_not(seg_df, total_frames):
+    seg_or_not = np.zeros((total_frames,))
+    for index, seg in seg_df.iterrows():
+        np.put(seg_or_not, list(range(seg['start_frame'], seg['end_frame'])), 1)
+    return seg_or_not
 
 
 def summarize_segments(seg_df):
@@ -175,11 +182,6 @@ def plot_groups(frame, groups_series):
     plt.title("Detected Groups for each Frame")
     plt.show()
 
-def wildwest():
-    # does frame always equal index number? it might not with mia values...
-    # it doesn't...
-    # id0 = full_df.loc[full_df['face_id'] == 0]
-    pass
 
 if __name__ == "__main__":
     # first argument should be the basename of the video
@@ -204,5 +206,8 @@ if __name__ == "__main__":
         seg_df = find_segments_from_clusters(au_df)
 
     seg_lens = summarize_segments(seg_df)
+
+    thing = dataframe_to_seg_or_not(seg_df, au_df['frame'].max())
+
     # output the resulting segments to file
-    # seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv", index=False)
+    seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv", index=False)
