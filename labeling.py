@@ -13,11 +13,24 @@ from PyQt5.QtGui import QIcon
 import sys
 
 class EmotionButton(QPushButton):
-    def __init__(self, name, styleSheet=None):
+    def __init__(self, name, vidWindow, styleSheet=None):
         super().__init__(name)
+        self.name = name
         if styleSheet is not None:
             self.setStyleSheet(styleSheet)
+        self.clicked.connect(self.emotion_button_click)
+        self.vidWindow = vidWindow
 
+    def emotion_button_click(self):
+        print('button hit')
+        # todo: this should save for the previous segment counted.
+        self.vidWindow.segments['label'][self.vidWindow.segment_counter] = self.name
+
+        self.vidWindow.playsegment(self.vidWindow.segment_counter)
+
+        self.vidWindow.segment_counter = self.vidWindow.segment_counter + 1
+        if self.vidWindow.segment_counter >= len(self.vidWindow.segments):
+            self.vidWindow.segment_counter = 0
 
 class VideoWindow(QMainWindow):
 
@@ -29,17 +42,19 @@ class VideoWindow(QMainWindow):
 
         videoWidget = QVideoWidget()
 
-        self.playButton = QPushButton()
-        self.playButton.setEnabled(False)
-        self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-        self.playButton.clicked.connect(self.play)
+        self.segment_counter = 0
+
+        # self.playButton = QPushButton()
+        # self.playButton.setEnabled(False)
+        # self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        # self.playButton.clicked.connect(self.play)
 
         self.positionSlider = QSlider(Qt.Horizontal)
         self.positionSlider.setRange(0, 0)
         self.positionSlider.sliderMoved.connect(self.setPosition)
 
-        self.button = QPushButton('button', self)
-        self.button.clicked.connect(self.on_click)
+        self.button = QPushButton('replay', self)
+        self.button.clicked.connect(lambda: self.playsegment(self.segment_counter))
 
         self.errorLabel = QLabel()
         self.errorLabel.setSizePolicy(QSizePolicy.Preferred,
@@ -52,6 +67,7 @@ class VideoWindow(QMainWindow):
         openAction.triggered.connect(self.openFile)
 
         # Create exit action
+        # todo: link this to x button
         exitAction = QAction(QIcon('exit.png'), '&Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.setStatusTip('Exit application')
@@ -71,7 +87,7 @@ class VideoWindow(QMainWindow):
         # Create layouts to place inside widget
         controlLayout = QHBoxLayout()
         controlLayout.setContentsMargins(0, 0, 0, 0)
-        controlLayout.addWidget(self.playButton)
+        # controlLayout.addWidget(self.playButton)
         controlLayout.addWidget(self.positionSlider)
         controlLayout.addWidget(self.button)
 
@@ -82,42 +98,42 @@ class VideoWindow(QMainWindow):
 
         hbox = QHBoxLayout()
         vbox1 = QVBoxLayout()
-        vbox1.addWidget(EmotionButton("Amusement", styleSheet="background-color: yellow"))
-        vbox1.addWidget(EmotionButton("Excitement", styleSheet="background-color: yellow"))
-        vbox1.addWidget(EmotionButton("Surprise", styleSheet="background-color: yellow"))
-        vbox1.addWidget(EmotionButton("Pride", styleSheet="background-color: cyan"))
-        vbox1.addWidget(EmotionButton("Love", styleSheet="background-color: hotpink"))
-        vbox1.addWidget(EmotionButton("Sexual Desire", styleSheet="background-color: hotpink"))
+        vbox1.addWidget(EmotionButton("Amusement", self, styleSheet="background-color: yellow"))
+        vbox1.addWidget(EmotionButton("Excitement", self, styleSheet="background-color: yellow"))
+        vbox1.addWidget(EmotionButton("Surprise", self, styleSheet="background-color: yellow"))
+        vbox1.addWidget(EmotionButton("Pride", self, styleSheet="background-color: cyan"))
+        vbox1.addWidget(EmotionButton("Love", self, styleSheet="background-color: hotpink"))
+        vbox1.addWidget(EmotionButton("Sexual Desire", self, styleSheet="background-color: hotpink"))
 
         vbox2 = QVBoxLayout()
-        vbox2.addWidget(EmotionButton("Contentment", styleSheet="background-color: green"))
-        vbox2.addWidget(EmotionButton("Relief", styleSheet="background-color: green"))
-        vbox2.addWidget(EmotionButton("Happiness", styleSheet="background-color: green"))
-        vbox2.addWidget(EmotionButton("Sadness", styleSheet="background-color: blue"))
-        vbox2.addWidget(EmotionButton("Disappointment", styleSheet="background-color: blue"))
-        vbox2.addWidget(EmotionButton("Guilt", styleSheet="background-color: blue"))
+        vbox2.addWidget(EmotionButton("Contentment", self, styleSheet="background-color: green"))
+        vbox2.addWidget(EmotionButton("Relief", self, styleSheet="background-color: green"))
+        vbox2.addWidget(EmotionButton("Happiness", self, styleSheet="background-color: green"))
+        vbox2.addWidget(EmotionButton("Sadness", self, styleSheet="background-color: blue"))
+        vbox2.addWidget(EmotionButton("Disappointment", self, styleSheet="background-color: blue"))
+        vbox2.addWidget(EmotionButton("Guilt", self, styleSheet="background-color: blue"))
 
         vbox3 = QVBoxLayout()
-        vbox3.addWidget(EmotionButton("Anger", styleSheet="background-color: red"))
-        vbox3.addWidget(EmotionButton("Contempt", styleSheet="background-color: red"))
-        vbox3.addWidget(EmotionButton("Pain", styleSheet="background-color: red"))
-        vbox3.addWidget(EmotionButton("Jealousy", styleSheet="background-color: purple"))
-        vbox3.addWidget(EmotionButton("Disgust", styleSheet="background-color: purple"))
+        vbox3.addWidget(EmotionButton("Anger", self, styleSheet="background-color: red"))
+        vbox3.addWidget(EmotionButton("Contempt", self, styleSheet="background-color: red"))
+        vbox3.addWidget(EmotionButton("Pain", self, styleSheet="background-color: red"))
+        vbox3.addWidget(EmotionButton("Jealousy", self, styleSheet="background-color: purple"))
+        vbox3.addWidget(EmotionButton("Disgust",self,  styleSheet="background-color: purple"))
 
         vbox4 = QVBoxLayout()
-        vbox4.addWidget(EmotionButton("Awkwardness", styleSheet="background-color: orange"))
-        vbox4.addWidget(EmotionButton("Confusion", styleSheet="background-color: orange"))
-        vbox4.addWidget(EmotionButton("Embarassment", styleSheet="background-color: orange"))
-        vbox4.addWidget(EmotionButton("Fear", styleSheet="background-color: orange"))
-        vbox4.addWidget(EmotionButton("Nervousness", styleSheet="background-color: orange"))
+        vbox4.addWidget(EmotionButton("Awkwardness", self, styleSheet="background-color: orange"))
+        vbox4.addWidget(EmotionButton("Confusion", self, styleSheet="background-color: orange"))
+        vbox4.addWidget(EmotionButton("Embarassment", self, styleSheet="background-color: orange"))
+        vbox4.addWidget(EmotionButton("Fear", self, styleSheet="background-color: orange"))
+        vbox4.addWidget(EmotionButton("Nervousness",self,  styleSheet="background-color: orange"))
 
 
         vbox5 = QVBoxLayout()
-        vbox5.addWidget(EmotionButton("Neutral", styleSheet="background-color: gray"))
-        vbox5.addWidget(EmotionButton("Boredom", styleSheet="background-color: gray"))
-        vbox5.addWidget(EmotionButton("Tired", styleSheet="background-color: gray"))
+        vbox5.addWidget(EmotionButton("Neutral", self, styleSheet="background-color: gray"))
+        vbox5.addWidget(EmotionButton("Boredom",self,  styleSheet="background-color: gray"))
+        vbox5.addWidget(EmotionButton("Tired",self,  styleSheet="background-color: gray"))
         vbox5.addSpacing(20)
-        vbox5.addWidget(EmotionButton("BAD CLIP"))
+        vbox5.addWidget(EmotionButton("BAD CLIP",self ))
 
         hbox.addLayout(vbox1)
         hbox.addLayout(vbox2)
@@ -146,9 +162,11 @@ class VideoWindow(QMainWindow):
         # needs an absolute path
         self.mediaPlayer.setMedia(
             QMediaContent(QUrl.fromLocalFile(os.path.abspath(video_path))))
-        self.playButton.setEnabled(True)
+        # self.playButton.setEnabled(True)
 
-        self.segment_counter = 0
+
+        # self.playsegment(self.segment_counter)
+        # todo: onstart it should play the first clip, so you can label it with a button press.
 
 
     def openFile(self):
@@ -162,7 +180,13 @@ class VideoWindow(QMainWindow):
         self.segments = pd.read_csv("segment_labels/" + os.path.basename(fileName).split('.')[0] + ".csv")
 
     def exitCall(self):
+        print('saving on exit')
+        # todo: make this path dynamic for whatevedr file
+        self.segments.to_csv("segment_labels/simple_test.csv", index=False)
         sys.exit(app.exec_())
+
+    def closeEvent(self, a):
+        self.exitCall()
 
     def play(self):
         if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
@@ -171,12 +195,13 @@ class VideoWindow(QMainWindow):
             self.mediaPlayer.play()
 
     def mediaStateChanged(self, state):
-        if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
-            self.playButton.setIcon(
-                    self.style().standardIcon(QStyle.SP_MediaPause))
-        else:
-            self.playButton.setIcon(
-                    self.style().standardIcon(QStyle.SP_MediaPlay))
+        # if self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+        #     self.playButton.setIcon(
+        #             self.style().standardIcon(QStyle.SP_MediaPause))
+        # else:
+        #     self.playButton.setIcon(
+        #             self.style().standardIcon(QStyle.SP_MediaPlay))
+        pass
 
     def positionChanged(self, position):
         self.positionSlider.setValue(position)
@@ -191,6 +216,18 @@ class VideoWindow(QMainWindow):
         self.playButton.setEnabled(False)
         self.errorLabel.setText("Error: " + self.mediaPlayer.errorString())
 
+    def playsegment(self, index):
+        startframe = self.segments['start_frame'][index]
+        endframe = self.segments['end_frame'][index]
+        # arg is milliseconds (assuming video is run at 30 fps)
+        frames_to_millisecs = startframe // 30 * 1000
+        self.mediaPlayer.setPosition(frames_to_millisecs)
+        self.mediaPlayer.play()
+        while self.mediaPlayer.position() * 30 // 1000 < endframe:
+            print(self.mediaPlayer.position() * 30 // 1000)
+        self.mediaPlayer.pause()
+
+
     def on_click(self):
         print('button hit')
         startframe = self.segments['start_frame'][self.segment_counter]
@@ -202,10 +239,6 @@ class VideoWindow(QMainWindow):
         while self.mediaPlayer.position() * 30 // 1000 < endframe:
             print(self.mediaPlayer.position() * 30 // 1000)
         self.mediaPlayer.pause()
-
-        self.segment_counter = self.segment_counter + 1
-        if self.segment_counter >= len(self.segments):
-            self.segment_counter = 0
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
