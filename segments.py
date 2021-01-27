@@ -40,7 +40,7 @@ def extract_features(video_path):
 
 
 # segment finding method 1
-def find_where_rolling_mean_deviates_from_threshold(au_df):
+def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
     # hyperparameters/adjustable things:
     # rolling mean window and method (currently 50)
     # threshold (currently median + 1 std)
@@ -52,7 +52,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
 
     # plots of the AUs are useful
     for col in smoothed_au_df.columns.drop('face_id').drop('frame'):
-        plot_au(smoothed_au_df['frame'], smoothed_au_df[col], col, "Smoothed AU Plot: " + col)
+        plot_au(smoothed_au_df['frame'], smoothed_au_df[col], col, "Smoothed AU Plot: " + col, manual_labels)
 
     # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
     au_deviants_df = pd.DataFrame()
@@ -64,18 +64,19 @@ def find_where_rolling_mean_deviates_from_threshold(au_df):
     any_au_deviates = au_deviants_df.any(axis=1)
 
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(smoothed_au_df['frame'], any_au_deviates)
+    plot_segment_or_not(smoothed_au_df['frame'], any_au_deviates, manual_labels=manual_labels)
 
     return segment_or_not_to_dataframe(smoothed_au_df['frame'], any_au_deviates, play_segs=False)
 
 
 # segment finding method 2
-def find_segments_from_clusters(au_df):
+def find_segments_from_clusters(au_df, manual_labels=None):
     # hyperparameters/adjustable things:
     # number of pca components (currently 8), and using this to reduce dimensionality
     # the clustering method (currently agglomerative)
     # distance_threshold for agglomerative or num_clusters for k means
     # method for determining useful groups (currently any group that isn't the main)
+    # todo: should i smooth this with a rolling window?
 
     from sklearn.decomposition import PCA
     pca = PCA(n_components=8)
@@ -104,7 +105,7 @@ def find_segments_from_clusters(au_df):
     not_in_most_common_group = group_for_each_frame != most_common_group
 
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(au_df['frame'], not_in_most_common_group)
+    plot_segment_or_not(au_df['frame'], not_in_most_common_group, manual_labels=manual_labels)
 
     return segment_or_not_to_dataframe(au_df['frame'],not_in_most_common_group, play_segs=False)
 
@@ -156,18 +157,24 @@ def delete_segments_by_length(seg_df, smallest_len=20, largest_len=200):
     return seg_df[(seg_lens >= smallest_len) & (seg_lens <= largest_len)]
 
 
-def plot_segment_or_not(frame, seg_or_not_series):
-    plt.plot(frame, seg_or_not_series)
+def plot_segment_or_not(frame, seg_or_not_series, manual_labels=None):
+    plt.plot(frame, seg_or_not_series, label="predicted segments")
+    if manual_labels is not None:
+        # shift by 1.5 so they don't overlap visually
+        plt.plot(frame, manual_labels * 1.5, label="manual segments")
     plt.xlabel("frame")
     plt.ylabel("segment or not")
     plt.title("Detected Segments for each Frame")
+    plt.legend()
     plt.show()
 
 
-def plot_au(frame, au_series, au_name, title):
+def plot_au(frame, au_series, au_name, title, manual_labels=None):
     plt.plot(frame, au_series, label=au_name)
     plt.plot(np.full(len(frame), au_series.median()), label="median")
     plt.plot(np.full(len(frame), au_series.median() + au_series.std()), label="median plus 1 std")
+    if manual_labels is not None:
+        plt.plot(frame, manual_labels, label="manual segments")
     plt.xlabel("frame")
     plt.ylabel(au_name)
     plt.title(title)
@@ -194,19 +201,26 @@ if __name__ == "__main__":
     # get the AU dataframe
     au_df = extract_features(video_name)
 
+    # if manual segments, we might want to see that
+    manual_seg_or_not = None
+    if os.path.exists("segment_labels/" + video_basename.split('.')[0] + "_manual.csv"):
+        manual_seg_df = pd.read_csv("segment_labels/" + video_basename.split('.')[0] + "_manual.csv")
+        manual_seg_or_not = dataframe_to_seg_or_not(manual_seg_df, au_df['frame'].max())
+
     # plotting the au's
     # for col in au_df.columns.drop('face_id').drop('frame'):
-    #     plot_au(au_df['frame'], au_df[col], col, "AU Plot: " + col)
+    #     plot_au(au_df['frame'], au_df[col], col, "AU Plot: " + col, manual_seg_or_not)
 
     if int(method_to_run) == 1:
         # method 1 for segments
-        seg_df = find_where_rolling_mean_deviates_from_threshold(au_df)
+        seg_df = find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=manual_seg_or_not)
     elif int(method_to_run) == 2:
         # method 2 for segments
-        seg_df = find_segments_from_clusters(au_df)
+        seg_df = find_segments_from_clusters(au_df, manual_labels=manual_seg_or_not)
 
     seg_lens = summarize_segments(seg_df)
 
+    # round trip (for testing)
     thing = dataframe_to_seg_or_not(seg_df, au_df['frame'].max())
 
     # output the resulting segments to file
