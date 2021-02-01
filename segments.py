@@ -47,7 +47,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
     # number of accepted au's (currently if any 1 deviates)
 
     # num_frames x num_AUs dataframe, using a rolling average to attempt to smooth points
-    smoothed_au_df = au_df.rolling(50, min_periods=1, center=True).mean()
+    smoothed_au_df = au_df.rolling(80, min_periods=1, center=True).mean()
 
     # plots of the AUs are useful
     # for col in smoothed_au_df.columns.drop('face_id'):
@@ -65,7 +65,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(any_au_deviates, manual_labels=manual_labels)
 
-    return segment_or_not_to_dataframe(au_df.index, any_au_deviates, play_segs=False)
+    return segment_or_not_to_dataframe(au_df.index, any_au_deviates)
 
 
 # segment finding method 2
@@ -76,16 +76,20 @@ def find_segments_from_clusters(au_df, manual_labels=None):
     # distance_threshold for agglomerative or num_clusters for k means
     # method for determining useful groups (currently any group that isn't the main)
 
-    # to use PCA/KMeans, we need to drop nans (missing values)
-    au_df = au_df.dropna()
-
     # smoothing seems like a good idea
     au_df = au_df.rolling(50, min_periods=1, center=True).mean()
+
+    # plotting the smoothed au's
+    for col in au_df.columns.drop('face_id'):
+        plot_au(au_df[col], col, "AU Plot: " + col, manual_seg_or_not)
+
+    # to use PCA/KMeans, we need to drop nans (missing values)
+    au_df = au_df.dropna()
 
     from sklearn.decomposition import PCA
     pca = PCA(n_components=4)
     # num_frames x num_components array
-    aus_transformed = pca.fit_transform(au_df.loc[:, 'AU01_r':'AU26_r'])
+    aus_transformed = pca.fit_transform(au_df[au_df.columns.drop('face_id')])
     # how many dimensions (components) is reasonable to cluster?
 
     from sklearn import cluster
@@ -111,12 +115,12 @@ def find_segments_from_clusters(au_df, manual_labels=None):
     # plots where segments are based on if any au deviates from median
     plot_segment_or_not(not_in_most_common_group, manual_labels=manual_labels)
 
-    return segment_or_not_to_dataframe(au_df.index, not_in_most_common_group, play_segs=False)
+    return segment_or_not_to_dataframe(au_df.index, not_in_most_common_group)
 
 
 # transforms a num_frames length bool series to a num_segments x 3 segments dataframe
 # play_segs will play the segments it finds if true
-def segment_or_not_to_dataframe(frame, seg_or_not_series, play_segs=False):
+def segment_or_not_to_dataframe(frame, seg_or_not_series):
     # https://stackoverflow.com/questions/7352684/how-to-find-the-groups-of-consecutive-elements-in-a-numpy-array
     def consecutive(arr, stepsize=1):
         return np.split(arr, np.where(np.diff(arr) != stepsize)[0] + 1)
@@ -124,15 +128,11 @@ def segment_or_not_to_dataframe(frame, seg_or_not_series, play_segs=False):
     list_of_segment_frames = consecutive(np.where(seg_or_not_series)[0])
 
     data = []
-    if play_segs:
-        import videos
 
     for seg in list_of_segment_frames:
         startF = int(frame[seg[0]])
         endF = int(frame[seg[-1]])
         data.append((startF, endF, 0))
-        if play_segs:
-            videos.play(video_name, startF, endF)
 
     return pd.DataFrame(data, columns=['start_frame', 'end_frame', 'label'])
 
@@ -182,7 +182,7 @@ def plot_au(au_series, au_name, title, manual_labels=None):
     plt.xlabel("frame")
     plt.ylabel(au_name)
     plt.title(title)
-    plt.legend()
+    # plt.legend()
     plt.show()
 
 
@@ -202,6 +202,22 @@ def add_missing_frames(au_df):
     return au_df.set_index("frame").reindex(new_index)
 
 
+def basic_information(au_df):
+    print("Number of total frames: " + str(au_df.index[-1]))
+    print("Number of missing frames: " + str(au_df['face_id'].isna().sum()))
+    print("Missing values: " + str(au_df.index[au_df['face_id'].isna()]))
+
+
+def feature_picker(au_df, desired_aus):
+    desired_aus.append("face_id")
+    return au_df[desired_aus]
+
+
+def play_segments(seg_df):
+    import videos
+    for index, seg in seg_df.iterrows():
+        videos.play(video_name, seg['start_frame'], seg['end_frame'])
+
 if __name__ == "__main__":
     # first argument should be the basename of the video
     video_basename = sys.argv[1]
@@ -215,6 +231,10 @@ if __name__ == "__main__":
 
     # make sure that missing frames are accounted for
     au_df = add_missing_frames(au_df)
+
+    basic_information(au_df)
+
+    # au_df = feature_picker(au_df, ['AU06_r', 'AU20_r', 'AU01_r', 'AU02_r'])
 
     # if manual segments, we might want to see that
     manual_seg_or_not = None
@@ -239,6 +259,9 @@ if __name__ == "__main__":
 
     if seg_df is not None:
         seg_lens = summarize_segments(seg_df)
+
+        # edit segments to not have too short or too long
+        seg_df = delete_segments_by_length(seg_df, smallest_len=30, largest_len=300)
 
         # round trip (for testing)
         thing = dataframe_to_seg_or_not(seg_df, au_df.index[-1])
