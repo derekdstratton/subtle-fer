@@ -34,8 +34,9 @@ def extract_features(video_path):
     col_indices = list(range(list(full_df.columns).index('AU01_r'), list(full_df.columns).index('AU26_r')+1))
     col_indices.append(0)
     col_indices.append(1)
-    id0 = full_df.loc[full_df['face_id'] == 0]
-    return id0.iloc[:, col_indices]
+    return dict(tuple(full_df.iloc[:, col_indices].groupby('face_id')))
+    # id0 = full_df.loc[full_df['face_id'] == 0]
+    # return id0.iloc[:, col_indices]
     # return full_df.loc[:, 'AU01_r':'AU26_r']
 
 
@@ -69,7 +70,7 @@ def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
 
 
 # segment finding method 2
-def find_segments_from_clusters(au_df, manual_labels=None):
+def find_segments_from_clusters(au_df, face_id, manual_labels=None):
     # hyperparameters/adjustable things:
     # number of pca components (currently 8), and using this to reduce dimensionality
     # the clustering method (currently agglomerative)
@@ -80,16 +81,16 @@ def find_segments_from_clusters(au_df, manual_labels=None):
     au_df = au_df.rolling(50, min_periods=1, center=True).mean()
 
     # plotting the smoothed au's
-    for col in au_df.columns.drop('face_id'):
-        plot_au(au_df[col], col, "AU Plot: " + col, manual_seg_or_not)
+    # for col in au_df.columns.drop('face_id'):
+    #     plot_au(au_df[col], col, "AU Plot: " + col, manual_seg_or_not)
 
     # to use PCA/KMeans, we need to drop nans (missing values)
-    au_df = au_df.dropna()
+    au_df_nona = au_df.dropna()
 
     from sklearn.decomposition import PCA
     pca = PCA(n_components=4)
     # num_frames x num_components array
-    aus_transformed = pca.fit_transform(au_df[au_df.columns.drop('face_id')])
+    aus_transformed = pca.fit_transform(au_df_nona[au_df_nona.columns.drop('face_id')])
     # how many dimensions (components) is reasonable to cluster?
 
     from sklearn import cluster
@@ -105,15 +106,20 @@ def find_segments_from_clusters(au_df, manual_labels=None):
     # # num_frames length array with each value being from 0 to num_groups - 1
     # group_for_each_frame = agg.labels_
 
-    plot_groups(group_for_each_frame)
+    # todo: this also needs reindexed to handle mia values
+    # plot_groups(group_for_each_frame, face_id)
 
     # one problem with clusters is knowing which cluster(s) are interesting or not
     # i'm just saying if it's not in the most common group, it's interesting.
     most_common_group = np.bincount(group_for_each_frame).argmax()
     not_in_most_common_group = group_for_each_frame != most_common_group
 
+    fyou = pd.DataFrame(not_in_most_common_group)
+    fyou2 = fyou.set_index(au_df_nona.index)
+    fyou3 = fyou2.reindex(au_df.index)
+
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(not_in_most_common_group, manual_labels=manual_labels)
+    plot_segment_or_not(fyou3, face_id, manual_labels=manual_labels)
 
     return segment_or_not_to_dataframe(au_df.index, not_in_most_common_group)
 
@@ -161,14 +167,14 @@ def delete_segments_by_length(seg_df, smallest_len=20, largest_len=200):
     return seg_df[(seg_lens >= smallest_len) & (seg_lens <= largest_len)]
 
 
-def plot_segment_or_not(seg_or_not_series, manual_labels=None):
+def plot_segment_or_not(seg_or_not_series, face_id, manual_labels=None):
     plt.plot(seg_or_not_series, label="predicted segments")
     if manual_labels is not None:
         # shift by 1.5 so they don't overlap visually
         plt.plot(manual_labels * 1.5, label="manual segments", linestyle="dashed")
     plt.xlabel("frame")
     plt.ylabel("segment or not")
-    plt.title("Detected Segments for each Frame")
+    plt.title("Detected Segments for each Frame, face_id=" + str(face_id))
     plt.legend()
     plt.show()
 
@@ -186,19 +192,19 @@ def plot_au(au_series, au_name, title, manual_labels=None):
     plt.show()
 
 
-def plot_groups(groups_series):
+def plot_groups(groups_series, face_id):
     plt.plot(groups_series)
     plt.xlabel("frame")
     plt.ylabel("group")
-    plt.title("Detected Groups for each Frame")
+    plt.title("Detected Groups for each Frame, face_id: " + str(face_id))
     plt.show()
 
 
 # they are represented as nan
 # this also makes the index the frames between 1 and the last frame
-def add_missing_frames(au_df):
+def add_missing_frames(au_df, last_frame):
     # https://stackoverflow.com/questions/25909984/missing-data-insert-rows-in-pandas-and-fill-with-nan
-    new_index = pd.Index(np.arange(1, au_df['frame'].iloc[-1]))
+    new_index = pd.Index(np.arange(1, last_frame))
     return au_df.set_index("frame").reindex(new_index)
 
 
@@ -218,6 +224,7 @@ def play_segments(seg_df):
     for index, seg in seg_df.iterrows():
         videos.play(video_name, seg['start_frame'], seg['end_frame'])
 
+
 if __name__ == "__main__":
     # first argument should be the basename of the video
     video_basename = sys.argv[1]
@@ -227,44 +234,49 @@ if __name__ == "__main__":
     method_to_run = sys.argv[2]
 
     # get the AU dataframe
-    au_df = extract_features(video_name)
+    all_au_dfs = extract_features(video_name)
+    # last frame is the final from every seen face
+    last_frame = max([df['frame'].iloc[-1] for k, df in all_au_dfs.items()])
+    all_seg_dfs = {}
+    for face_id, au_df in all_au_dfs.items():
 
-    # make sure that missing frames are accounted for
-    au_df = add_missing_frames(au_df)
+        # make sure that missing frames are accounted for
+        au_df = add_missing_frames(au_df, last_frame)
 
-    basic_information(au_df)
+        basic_information(au_df)
 
-    # au_df = feature_picker(au_df, ['AU06_r', 'AU20_r', 'AU01_r', 'AU02_r'])
+        # au_df = feature_picker(au_df, ['AU06_r', 'AU20_r', 'AU01_r', 'AU02_r'])
 
-    # if manual segments, we might want to see that
-    manual_seg_or_not = None
-    if os.path.exists("segment_labels/" + video_basename.split('.')[0] + "_manual.csv"):
-        manual_seg_df = pd.read_csv("segment_labels/" + video_basename.split('.')[0] + "_manual.csv")
-        manual_seg_or_not = dataframe_to_seg_or_not(manual_seg_df, au_df.index[-1])
+        # if manual segments, we might want to see that
+        manual_seg_or_not = None
+        if os.path.exists("segment_labels/" + video_basename.split('.')[0] + "_manual.csv"):
+            manual_seg_df = pd.read_csv("segment_labels/" + video_basename.split('.')[0] + "_manual.csv")
+            manual_seg_or_not = dataframe_to_seg_or_not(manual_seg_df, au_df.index[-1])
 
-    # plotting the au's
-    # for col in au_df.columns.drop('face_id'):
-    #     plot_au(au_df[col], col, "AU Plot: " + col, manual_seg_or_not)
+        # plotting the au's
+        # for col in au_df.columns.drop('face_id'):
+        #     plot_au(au_df[col], col, "AU Plot: " + col + ", Face ID: " + str(face_id), manual_seg_or_not)
 
-    seg_df = None
+        seg_df = None
 
-    if int(method_to_run) == 1:
-        # method 1 for segments
-        seg_df = find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=manual_seg_or_not)
-    elif int(method_to_run) == 2:
-        # method 2 for segments
-        seg_df = find_segments_from_clusters(au_df, manual_labels=manual_seg_or_not)
-    else:
-        print("Invalid method to run: " + method_to_run)
+        if int(method_to_run) == 1:
+            # method 1 for segments
+            seg_df = find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=manual_seg_or_not)
+        elif int(method_to_run) == 2:
+            # method 2 for segments
+            seg_df = find_segments_from_clusters(au_df, face_id, manual_labels=manual_seg_or_not)
+        else:
+            print("Invalid method to run: " + method_to_run)
 
-    if seg_df is not None:
-        seg_lens = summarize_segments(seg_df)
+        if seg_df is not None:
+            seg_lens = summarize_segments(seg_df)
 
-        # edit segments to not have too short or too long
-        seg_df = delete_segments_by_length(seg_df, smallest_len=30, largest_len=300)
+            # edit segments to not have too short or too long
+            seg_df = delete_segments_by_length(seg_df, smallest_len=30, largest_len=300)
 
-        # round trip (for testing)
-        thing = dataframe_to_seg_or_not(seg_df, au_df.index[-1])
+            # round trip (for testing)
+            thing = dataframe_to_seg_or_not(seg_df, au_df.index[-1])
 
-        # output the resulting segments to file
-        seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + ".csv", index=False)
+            # output the resulting segments to file
+            seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + str(face_id) + ".csv", index=False)
+            all_seg_dfs[face_id] = seg_df
