@@ -23,8 +23,8 @@ def extract_features(video_path):
         # os.system(openface_build_path + "/FeatureExtraction")
 
         # https://github.com/TadasBaltrusaitis/OpenFace/wiki/Command-line-arguments
-        # subprocess.run([openface_build_path + "/FeatureExtraction", "-f", video_path])  # , "-aus"])
-        subprocess.run([openface_build_path + "/FaceLandmarkVidMulti", "-f", video_path])  # , "-aus"])
+        subprocess.run([openface_build_path + "/FeatureExtraction", "-f", video_path])
+        # subprocess.run([openface_build_path + "/FaceLandmarkVidMulti", "-f", video_path])
     else:
         print("csv file already exists, loading into df")
     full_df = pd.read_csv(csv_from_video_path)
@@ -34,9 +34,8 @@ def extract_features(video_path):
     col_indices = list(range(list(full_df.columns).index('AU01_r'), list(full_df.columns).index('AU26_r')+1))
     col_indices.append(0)
     col_indices.append(1)
-    return dict(tuple(full_df.iloc[:, col_indices].groupby('face_id')))
-    # id0 = full_df.loc[full_df['face_id'] == 0]
-    # return id0.iloc[:, col_indices]
+    return full_df.iloc[:, col_indices]
+    # return dict(tuple(full_df.iloc[:, col_indices].groupby('face_id')))
     # return full_df.loc[:, 'AU01_r':'AU26_r']
 
 
@@ -114,12 +113,12 @@ def find_segments_from_clusters(au_df, face_id, manual_labels=None):
     most_common_group = np.bincount(group_for_each_frame).argmax()
     not_in_most_common_group = group_for_each_frame != most_common_group
 
-    fyou = pd.DataFrame(not_in_most_common_group)
-    fyou2 = fyou.set_index(au_df_nona.index)
-    fyou3 = fyou2.reindex(au_df.index)
+    aa1 = pd.DataFrame(not_in_most_common_group)
+    aa2 = aa1.set_index(au_df_nona.index)
+    aa3 = aa2.reindex(au_df.index)
 
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(fyou3, face_id, manual_labels=manual_labels)
+    plot_segment_or_not(aa3, face_id, manual_labels=manual_labels)
 
     return segment_or_not_to_dataframe(au_df.index, not_in_most_common_group)
 
@@ -249,8 +248,8 @@ if __name__ == "__main__":
 
         # if manual segments, we might want to see that
         manual_seg_or_not = None
-        if os.path.exists("segment_labels/" + video_basename.split('.')[0] + "_manual.csv"):
-            manual_seg_df = pd.read_csv("segment_labels/" + video_basename.split('.')[0] + "_manual.csv")
+        if os.path.exists("segment_labels/" + video_basename.split('.')[0] + "_manual" + str(face_id) + ".csv"):
+            manual_seg_df = pd.read_csv("segment_labels/" + video_basename.split('.')[0] + "_manual" + str(face_id) + ".csv")
             manual_seg_or_not = dataframe_to_seg_or_not(manual_seg_df, au_df.index[-1])
 
         # plotting the au's
@@ -279,4 +278,5 @@ if __name__ == "__main__":
 
             # output the resulting segments to file
             seg_df.to_csv("segment_labels/" + video_basename.split('.')[0] + str(face_id) + ".csv", index=False)
+
             all_seg_dfs[face_id] = seg_df
