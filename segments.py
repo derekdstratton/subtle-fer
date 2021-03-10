@@ -23,7 +23,7 @@ def extract_features(video_path):
         # os.system(openface_build_path + "/FeatureExtraction")
 
         # https://github.com/TadasBaltrusaitis/OpenFace/wiki/Command-line-arguments
-        subprocess.run([openface_build_path + "/FeatureExtraction", "-f", video_path])
+        subprocess.run([openface_build_path + "/FeatureExtraction", "-f", "videos/" + video_path])
         # subprocess.run([openface_build_path + "/FaceLandmarkVidMulti", "-f", video_path])
     else:
         print("csv file already exists, loading into df")
@@ -50,8 +50,8 @@ def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
     smoothed_au_df = au_df.rolling(80, min_periods=1, center=True).mean()
 
     # plots of the AUs are useful
-    # for col in smoothed_au_df.columns.drop('face_id'):
-    #     plot_au(smoothed_au_df[col], col, "Smoothed AU Plot: " + col, manual_labels)
+    for col in smoothed_au_df.columns.drop('face_id'):
+        plot_au(smoothed_au_df[col], col, "Smoothed AU Plot: " + col, manual_labels)
 
     # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
     au_deviants_df = pd.DataFrame()

@@ -154,10 +154,10 @@ def assign_face_ids(video_basename):
 
     for idx, data in tqdm.tqdm(enumerate(dataloader)):
         embedding = model(data[0][0].unsqueeze(0).float())
-        if idx < 10:
-            plt.imshow(data[0][0].numpy().transpose(1,2,0))
-            plt.title(str(idx))
-            plt.show()
+        # if idx < 10:
+        #     plt.imshow(data[0][0].numpy().transpose(1,2,0))
+        #     plt.title(str(idx))
+        #     plt.show()
         arr[idx] = embedding.detach().numpy()
 
         ####
@@ -242,6 +242,57 @@ def play(video_path, start_frame=0, end_frame=None):
         else:
             break
 
+    # When everything done, release
+    # the video capture object
+    cap.release()
+
+    # Closes all the frames
+    cv2.destroyAllWindows()
+    return cap
+
+def save_sub_video(video_path, start_frame, end_frame, out_path):
+    cap = cv2.VideoCapture(video_path)
+    # Create a VideoCapture object and read from input file
+    # Check if camera opened successfully
+    # https://subscription.packtpub.com/book/application_development/9781788474443/1/ch01lvl1sec24/jumping-between-frames-in-video-files
+
+    out_dim = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    #
+
+    out = cv2.VideoWriter(out_path,
+                          cv2.VideoWriter_fourcc(*'mp4v'),
+                          30,
+                          out_dim
+                          )
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    if (cap.isOpened() == False):
+        print("Error opening video  file")
+
+        # Read until video is completed
+    while (cap.isOpened()):
+
+        # Capture frame-by-frame
+        ret, frame = cap.read()
+        # to stop a video, while frame < STOPPING_NUM
+        if ret == True:
+
+            # Display the resulting frame
+            # cv2.imshow('Frame', frame)
+            out.write(frame)
+            print(cap.get(cv2.CAP_PROP_POS_FRAMES))
+            # Press Q on keyboard to  exit
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                break
+
+            if end_frame is not None and cap.get(cv2.CAP_PROP_POS_FRAMES) >= end_frame:
+                break
+
+        # Break the loop
+        else:
+            break
+
+    out.release()
     # When everything done, release
     # the video capture object
     cap.release()
