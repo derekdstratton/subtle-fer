@@ -35,22 +35,30 @@ def try_download(link):
         print("File already exists")
     return ys.default_filename.replace(" ", "_")
 
-def detect_faces(video_path):
-    if not os.path.exists("detections"):
-        os.mkdir("detections")
 
+# video_path: relative path to the video
+def detect_faces(video_path):
+    # pathing
+    faces_output_basepath = "cropped_face_detections"
+    if not os.path.exists(faces_output_basepath):
+        os.mkdir(faces_output_basepath)
+    video_basename = os.path.splitext(os.path.basename(video_path))[0]
+    # if not os.path.exists("detections/" + video_basename + "/faces"):
+    #     os.mkdir("detections/" + video_basename)
+    #     os.mkdir("detections/" + video_basename + "/faces")
+    faces_video_path = os.path.join(faces_output_basepath, video_basename)
+    if not os.path.exists(faces_video_path):
+        os.mkdir(faces_video_path)
+    faces_video_path_inner = os.path.join(faces_video_path, "faces")
+    if not os.path.exists(faces_video_path_inner):
+        os.mkdir(faces_video_path_inner)
+
+    # load face detector and the video
     import face_detection
     detector = face_detection.build_detector(
         "DSFDDetector", confidence_threshold=.5, nms_iou_threshold=.3)
     cap = cv2.VideoCapture(video_path)
 
-    base_name = os.path.basename(video_path).split(".")[0]
-    if not os.path.exists("detections/" + base_name + "/faces"):
-        os.mkdir("detections/" + base_name)
-        os.mkdir("detections/" + base_name + "/faces")
-
-    # todo: make sure this folder exists.
-    #
     # Create a VideoCapture object and read from input file
     # Check if camera opened successfully
     # https://subscription.packtpub.com/book/application_development/9781788474443/1/ch01lvl1sec24/jumping-between-frames-in-video-files
@@ -93,8 +101,9 @@ def detect_faces(video_path):
                 #           int(face_bounds[0]):int(face_bounds[2])]
                 # pass
                 if cropped.size > 0 and face_bounds[4] > 0.9:# and (cropped.size / frame.size) > 0.02:
-                    cv2.imwrite("detections/" + base_name + "/faces/" +
-                                str(frame_num) + "_" + str(i) + ".jpg", cropped)
+                    # cv2.imwrite("detections/" + video_basename + "/faces/" +
+                    #             str(frame_num) + "_" + str(i) + ".jpg", cropped)
+                    cv2.imwrite(faces_video_path_inner + "/" + str(frame_num) + "_" + str(i) + ".jpg", cropped)
             print(cap.get(cv2.CAP_PROP_POS_FRAMES))
             # Press Q on keyboard to  exit
             if cv2.waitKey(25) & 0xFF == ord('q'):
@@ -137,7 +146,8 @@ def assign_face_ids(video_basename):
         transforms.ToTensor(),
         # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
-    dataset = torchvision.datasets.ImageFolder("detections/" + video_basename, transform=tt)
+    # dataset = torchvision.datasets.ImageFolder("detections/" + video_basename, transform=tt)
+    dataset = torchvision.datasets.ImageFolder(video_basename, transform=tt)
     dataloader = torch.utils.data.DataLoader(dataset)#,sampler=np.arange(1000))
     anchor_embeddings = {}  # int key, tensor value
 

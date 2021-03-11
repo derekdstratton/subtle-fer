@@ -12,10 +12,13 @@ import numpy as np
 # takes a video file, and returns a dataframe with all the AUs
 # uses OpenFace to find the AUs. it will skip processing if it finds it's already been processed
 # https://github.com/TadasBaltrusaitis/OpenFace/wiki/Action-Units
+# todo: make a -o arg
 def extract_features(video_path):
-    base_path = os.path.basename(video_path)
-    csv_from_video_path = "processed/" + base_path.split('.')[0] + ".csv"
-    if not os.path.isfile(csv_from_video_path):
+    fixed_path = video_path.replace("/", "_")
+    fixed_path = os.path.splitext(fixed_path)[0]
+    fixed_path = os.path.join("processed", fixed_path)
+    csv_file = os.path.join(fixed_path, os.path.splitext(os.path.basename(video_path))[0] + ".csv")
+    if not os.path.isfile(csv_file):
         openface_build_path = os.environ['OPENFACE_PATH']
 
         # for a single person
@@ -23,11 +26,11 @@ def extract_features(video_path):
         # os.system(openface_build_path + "/FeatureExtraction")
 
         # https://github.com/TadasBaltrusaitis/OpenFace/wiki/Command-line-arguments
-        subprocess.run([openface_build_path + "/FeatureExtraction", "-f", "videos/" + video_path])
+        subprocess.run([openface_build_path + "/FeatureExtraction", "-f", video_path, "-out_dir", fixed_path])
         # subprocess.run([openface_build_path + "/FaceLandmarkVidMulti", "-f", video_path])
     else:
         print("csv file already exists, loading into df")
-    full_df = pd.read_csv(csv_from_video_path)
+    full_df = pd.read_csv(csv_file)
     # num_frames x num_AUs dataframe containing the AU intensity for each video frame
     # note: you can change the first slice here to look at a subset of video frames
     # note: i'm currently removing au 45 (blinking), it gave me worse results.

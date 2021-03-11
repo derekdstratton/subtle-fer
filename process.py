@@ -2,30 +2,15 @@ import videos
 import segments
 import os
 
-# basename = "simple_test"
-# basename = "When_Among_Us_Arguments_Go_TOO_FAR_-_Pokimane_&_Valkyrae_Rage"
-# basename = "Psychic_Cringe_Fails_1_-_HILARIOUS_REACTION"
-basename = "Z_DisgustText_TrailNo_1"
+def create_face_videos(videos_path):
+    basename = os.path.basename(videos_path)
+    # fullpath = os.path.join(videos_path, video)
+    df = videos.assign_face_ids(videos_path)
 
-# 0. download? change frame rate?
-
-# 1. use face detection algorithm to create image folder of faces
-# (it's possible it detect bad faces, or miss faces)
-# NOTE: this needs the trained SVM
-# todo: make check to see if the detections exist first
-videos.detect_faces("videos/" + basename + ".mp4")
-
-aligned_videos_paths = []
-# if already contains these, just load them
-for video in os.listdir("videos"):
-    if "aligned" in video and basename in video:
-        aligned_videos_paths.append(video)
-
-# 2. use face verification algorithm to iterate over images and assign ids
-# (it's possible to mismatch)
-# todo: be able to save and load from this step and next step
-if len(aligned_videos_paths) == 0:
-    df = videos.assign_face_ids(basename)
+    if not os.path.exists("cropped_face_videos"):
+        os.mkdir("cropped_face_videos")
+    if not os.path.exists(os.path.join("cropped_face_videos", basename)):
+        os.mkdir(os.path.join("cropped_face_videos", basename))
 
     # 3. create a video for each aligned face found
     aligned_videos_paths = []
@@ -36,24 +21,49 @@ if len(aligned_videos_paths) == 0:
         # frames = df[df['id'] == id]['frame']
         # if len(frame_paths) > 100: # todo: this doesnt always apply...
         if len(frame_paths) > 30:
-            out_path = "videos/" + basename + "_aligned_" + str(int(id)) + ".mp4"
+            out_path = os.path.join("cropped_face_videos", basename) + "/" + str(int(id)) + ".mp4"
+            # out_path = "videos/" + basename + "_aligned_" + str(int(id)) + ".mp4"
             videos.make_aligned_video(frame_paths, out_path)
             aligned_videos_paths.append(out_path)
 
-# 4. find segments for each aligned video
-# you need openface installed, and the OPENFACE_PATH defined
-seg_dfs = {}
-for aligned_vid in aligned_videos_paths:
-    try:
-        au_df = segments.extract_features(aligned_vid)
+# 0. downloading videos? change frame rate?
+original_videos_directory = "original_videos"
+face_images_basepath = "cropped_face_detections"
+face_videos_basepath = "cropped_face_videos"
+segment_videos_output_basepath = "segmented_videos"
+if not os.path.isdir(segment_videos_output_basepath):
+    os.mkdir(segment_videos_output_basepath)
+
+for video in os.listdir(original_videos_directory):
+    # 1. Detect and crop faces in a video by frame and output to a folder of images
+    videoname_noext = os.path.splitext(video)[0]
+    original_video_path = os.path.join(original_videos_directory, video)
+    face_detections_path = os.path.join(face_images_basepath, videoname_noext)
+    if not os.path.exists(face_detections_path):
+        # todo: make check to see if the detections exist first
+        videos.detect_faces(original_video_path)
+        assert os.path.exists(face_detections_path)
+
+    # 2. Make a video for each face in the video, and output to a folder of videos
+    face_videos_path = os.path.join(face_videos_basepath, videoname_noext)
+    if not os.path.exists(face_videos_path):
+        create_face_videos(face_detections_path)
+        # todo: move this function to "videos.py"
+        assert os.path.exists(face_videos_path)
+
+    # 3. Find expression segments for each cropped face video, output to a folder with a video per segment
+    for face_video in os.listdir(face_videos_path):
+        face_video_file = os.path.join(face_videos_path, face_video)
+        au_df = segments.extract_features(face_video_file)
         au_df = segments.add_missing_frames(au_df, au_df['frame'].iloc[-1])
         # seg_df = segments.find_where_rolling_mean_deviates_from_threshold(au_df)
-        seg_df = segments.find_segments_from_clusters(au_df, 0) # todo: face_id of 0 awkward
-        # seg_df = segments.delete_segments_by_length(seg_df, smallest_len=30, largest_len=300)
+        seg_df = segments.find_segments_from_clusters(au_df, 0)
+        # todo: face_id of 0 awkward, not general
+        output_path = os.path.join(segment_videos_output_basepath, os.path.basename(face_videos_path))
+        if not os.path.isdir(output_path):
+            os.mkdir(output_path)
         for index, seg in seg_df.iterrows():
-            videos.save_sub_video("videos/" + aligned_vid, seg[0], seg[1], "videos/" + os.path.basename(aligned_vid).split('.')[0] + str(index) + ".mp4")
-        seg_df.to_csv("segment_labels/" + os.path.basename(aligned_vid).split('.')[0] + ".csv", index=False)
-        seg_dfs[aligned_vid] = seg_df
-    except:
-        # lol
-        continue
+            output_video_file = output_path + "/" + str(index) + ".mp4"
+            videos.save_sub_video(face_video_file, seg[0], seg[1], output_video_file)
+
+exit(0)
