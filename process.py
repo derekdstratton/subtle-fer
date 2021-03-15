@@ -3,7 +3,8 @@ import segments
 import os
 
 # 0. downloading videos? change frame rate?
-original_videos_directory = "original_videos"
+# original_videos_directory = "original_videos"
+original_videos_directory = "EMMA_subset"
 face_images_basepath = "cropped_face_detections"
 face_videos_basepath = "cropped_face_videos"
 segment_videos_output_basepath = "segmented_videos"
@@ -31,9 +32,9 @@ for video in os.listdir(original_videos_directory):
         face_video_file = os.path.join(face_videos_path, face_video)
         au_df = segments.extract_features(face_video_file)
         au_df = segments.add_missing_frames(au_df, au_df['frame'].iloc[-1])
-        # seg_df = segments.find_where_rolling_mean_deviates_from_threshold(au_df)
-        seg_df = segments.find_segments_from_clusters(au_df, 0)
-        # todo: face_id of 0 awkward, not general
+        seg_df = segments.find_where_rolling_mean_deviates_from_threshold(au_df)
+        # seg_df = segments.find_segments_from_clusters(au_df, 0)
+        seg_df = segments.delete_segments_by_length(seg_df, smallest_len=20, largest_len=300)
         output_path = os.path.join(segment_videos_output_basepath, os.path.basename(face_videos_path))
         if not os.path.isdir(output_path):
             os.mkdir(output_path)

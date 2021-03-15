@@ -52,6 +52,7 @@ def detect_faces(video_path: str) -> str:
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
     if not cap.isOpened():
         print("Error opening video file")
+    found = False
     while cap.isOpened():
         # Capture frame-by-frame
         ret, frame = cap.read()
@@ -60,13 +61,14 @@ def detect_faces(video_path: str) -> str:
             # the list of detections, equal to amount of faces found in a frame
             detections = detector.detect(frame)
             for i, face_bounds in enumerate(detections):
-                if frame_num == 1.0:
+                if not found:
                     width = int(face_bounds[3]) - int(face_bounds[1])
                     height = int(face_bounds[2]) - int(face_bounds[0])
                     x_lower = int(face_bounds[1]) - (width // 2)
                     x_upper = int(face_bounds[3]) + (width // 2)
                     y_lower = int(face_bounds[0]) - (height // 2)
                     y_upper = int(face_bounds[2]) + (height // 2)
+                    found = True
 
                 # larger window (naive, still jittery)
                 # width = int(face_bounds[3]) - int(face_bounds[1])
@@ -335,7 +337,7 @@ def train_svm_on_lfw():
 # takes a series of image paths and concatenates them into a video
 def image_sequence_to_video(frame_paths, out_path):
     # (assuming all samples are the same size)
-    sample = cv2.imread(frame_paths[0])
+    sample = cv2.imread(frame_paths.iloc[0])
     out_dim = (sample.shape[1], sample.shape[0])
 
     out = cv2.VideoWriter(out_path,

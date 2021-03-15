@@ -50,25 +50,32 @@ def find_where_rolling_mean_deviates_from_threshold(au_df, manual_labels=None):
     # number of accepted au's (currently if any 1 deviates)
 
     # num_frames x num_AUs dataframe, using a rolling average to attempt to smooth points
-    smoothed_au_df = au_df.rolling(80, min_periods=1, center=True).mean()
+    smoothed_au_df = au_df.rolling(10, min_periods=1, center=True).mean()
+
+    # so stupidly simple but it kinda works LOL
+    norm = np.linalg.norm(smoothed_au_df[smoothed_au_df.columns.drop('face_id')], axis=1)
+    threshold = np.median(norm) + np.std(norm)
+    bools = norm > threshold
+    plt.plot(norm)
+    plt.show()
 
     # plots of the AUs are useful
-    for col in smoothed_au_df.columns.drop('face_id'):
-        plot_au(smoothed_au_df[col], col, "Smoothed AU Plot: " + col, manual_labels)
+    # for col in smoothed_au_df.columns.drop('face_id'):
+    #     plot_au(smoothed_au_df[col], col, "Smoothed AU Plot: " + col, manual_labels)
 
     # num_frames x num_AUs boolean dataframe, where it's true if the smoothed value is > 1 std away from median
-    au_deviants_df = pd.DataFrame()
-    for col in smoothed_au_df.columns.drop('face_id'):
-        threshold = smoothed_au_df[col].median() + smoothed_au_df[col].std()
-        au_deviants_df[col] = smoothed_au_df[col] > threshold
-
-    # num_frames boolean series if any of the AUs deviate
-    any_au_deviates = au_deviants_df.any(axis=1)
+    # au_deviants_df = pd.DataFrame()
+    # for col in smoothed_au_df.columns.drop('face_id'):
+    #     threshold = smoothed_au_df[col].median() + smoothed_au_df[col].std()
+    #     au_deviants_df[col] = smoothed_au_df[col] > threshold
+    #
+    # # num_frames boolean series if any of the AUs deviate
+    # any_au_deviates = au_deviants_df.any(axis=1)
 
     # plots where segments are based on if any au deviates from median
-    plot_segment_or_not(any_au_deviates, manual_labels=manual_labels)
+    plot_segment_or_not(bools, 0, manual_labels=manual_labels)
 
-    return segment_or_not_to_dataframe(au_df.index, any_au_deviates)
+    return segment_or_not_to_dataframe(au_df.index, bools)
 
 
 # segment finding method 2
@@ -78,6 +85,8 @@ def find_segments_from_clusters(au_df, face_id, manual_labels=None):
     # the clustering method (currently agglomerative)
     # distance_threshold for agglomerative or num_clusters for k means
     # method for determining useful groups (currently any group that isn't the main)
+
+    # np.linalg.norm(au_df_nona[au_df_nona.columns.drop('face_id')], axis=1)
 
     # smoothing seems like a good idea
     au_df = au_df.rolling(50, min_periods=1, center=True).mean()
@@ -108,13 +117,21 @@ def find_segments_from_clusters(au_df, face_id, manual_labels=None):
     # # num_frames length array with each value being from 0 to num_groups - 1
     # group_for_each_frame = agg.labels_
 
+    # import hdbscan
+    # clusterer = hdbscan.HDBSCAN(metric='manhattan', prediction_data=True)
+    # clusterer.fit(aus_transformed)
+
     # todo: this also needs reindexed to handle mia values
     # plot_groups(group_for_each_frame, face_id)
-
+    # the idea of this choice is that the closest cluster center to all 0s AUs is probably the boring one
+    base = pca.transform(np.zeros((1,16)))
+    choice = np.argmin(np.linalg.norm(base[0] - kmeans.cluster_centers_, axis=1))
+    not_in_most_common_group = group_for_each_frame != choice
     # one problem with clusters is knowing which cluster(s) are interesting or not
     # i'm just saying if it's not in the most common group, it's interesting.
-    most_common_group = np.bincount(group_for_each_frame).argmax()
-    not_in_most_common_group = group_for_each_frame != most_common_group
+    # most_common_group = np.bincount(group_for_each_frame).argmax()
+    # not_in_most_common_group = group_for_each_frame != most_common_group
+
 
     aa1 = pd.DataFrame(not_in_most_common_group)
     aa2 = aa1.set_index(au_df_nona.index)
