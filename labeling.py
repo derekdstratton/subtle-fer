@@ -23,15 +23,19 @@ class EmotionButton(QPushButton):
 
     def emotion_button_click(self):
         print('button hit')
-        self.vidWindow.segments['label'][self.vidWindow.segment_counter] = self.name
+        # self.vidWindow.segments['label'][self.vidWindow.segment_counter] = self.name
+        # TODO: label the data here
+        self.vidWindow.df['label'][self.vidWindow.segment_counter] = self.name
 
-        if self.vidWindow.segment_counter >= len(self.vidWindow.segments)-1:
-            print("YOURE FINISHED HERE")
+        if self.vidWindow.segment_counter >= len(self.vidWindow.files)-1:
+            print("YOURE FINISHED HERE: AUTOSAVING.")
             self.vidWindow.segmentLabel.setStyleSheet("color:green")
+            self.vidWindow.df.to_csv(self.vidWindow.labels_path)
             return
         self.vidWindow.segment_counter = self.vidWindow.segment_counter + 1
-        self.vidWindow.segmentLabel.setText(str(self.vidWindow.segment_counter) + "/" + str(len(self.vidWindow.segments)-1))
-        self.vidWindow.playsegment(self.vidWindow.segment_counter)
+        self.vidWindow.segmentLabel.setText(str(self.vidWindow.segment_counter) + "/" + str(len(self.vidWindow.files)-1))
+        # self.vidWindow.playsegment(self.vidWindow.segment_counter)
+        self.vidWindow.simpleplay(self.vidWindow.segment_counter)
 
 
 class VideoWindow(QMainWindow):
@@ -46,17 +50,17 @@ class VideoWindow(QMainWindow):
 
         self.segment_counter = 0
 
-        # self.playButton = QPushButton()
-        # self.playButton.setEnabled(False)
-        # self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
-        # self.playButton.clicked.connect(self.play)
+        self.playButton = QPushButton()
+        self.playButton.setEnabled(False)
+        self.playButton.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.playButton.clicked.connect(self.play)
 
         self.positionSlider = QSlider(Qt.Horizontal)
         self.positionSlider.setRange(0, 0)
         self.positionSlider.sliderMoved.connect(self.setPosition)
 
         self.replay = QPushButton('replay', self)
-        self.replay.clicked.connect(lambda: self.playsegment(self.segment_counter))
+        self.replay.clicked.connect(lambda: self.simpleplay(self.segment_counter))
 
         self.back = QPushButton('back', self)
         self.back.clicked.connect(self.goback)
@@ -70,8 +74,14 @@ class VideoWindow(QMainWindow):
         # Create new action
         openAction = QAction(QIcon('open.png'), '&Open', self)
         openAction.setShortcut('Ctrl+O')
-        openAction.setStatusTip('Open movie')
+        openAction.setStatusTip('Open folder')
         openAction.triggered.connect(self.openFile)
+
+        # saving action
+        saveAction = QAction(QIcon('save.png'), '&Save', self)
+        saveAction.setShortcut('Ctrl+S')
+        saveAction.setStatusTip('Save labels')
+        saveAction.triggered.connect(self.saveFile)
 
         # Create exit action
         # todo: link this to x button
@@ -85,6 +95,7 @@ class VideoWindow(QMainWindow):
         fileMenu = menuBar.addMenu('&File')
         #fileMenu.addAction(newAction)
         fileMenu.addAction(openAction)
+        fileMenu.addAction(saveAction)
         fileMenu.addAction(exitAction)
 
         # Create a widget for window contents
@@ -163,46 +174,59 @@ class VideoWindow(QMainWindow):
         self.mediaPlayer.durationChanged.connect(self.durationChanged)
         self.mediaPlayer.error.connect(self.handleError)
 
-        self.video_path = "videos/simple_test.mp4"
-        self.segments_path = "segment_labels/simple_test.csv"
-        self.segments = pd.read_csv(self.segments_path)
+        # self.video_path = "videos/simple_test.mp4"
+        # self.segments_path = "segment_labels/simple_test.csv"
+        # self.segments = pd.read_csv(self.segments_path)
 
         # open the media and segments
         # needs an absolute path
-        self.mediaPlayer.setMedia(
-            QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
+        # self.mediaPlayer.setMedia(
+        #     QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
         # self.playButton.setEnabled(True)
+        abspath = os.path.abspath("pilot_segments")
+        files = os.listdir("pilot_segments")
+        self.files = [abspath + "/" + x for x in files if ".mp4" in x]
 
-        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.segments)-1))
+        self.labels_path = "pilot_segments/labels.csv"
+        self.create_or_load_csv()
+
+        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.files)-1))
 
         # SUPER SCUFFED approach, may not work depending on how long it takes to load
         # https://stackoverflow.com/questions/45175427/pyqt5-run-function-after-displaying-window
-        QTimer.singleShot(1000, lambda: self.playsegment(0))  # waits for this to finish until gui displayed
+        QTimer.singleShot(1000, lambda: self.simpleplay(self.segment_counter))  # waits for this to finish until gui displayed
 
 
     def openFile(self):
-        fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
-                QDir.homePath())
-        print(fileName)
+        # fileName, _ = QFileDialog.getOpenFileName(self, "Open Movie",
+        #         QDir.homePath())
+        file = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        files = os.listdir(file)
+        self.files = [file + "/" + x for x in files if ".mp4" in x]
+        # print(fileName)
         print('saving current file')
-        self.segments.to_csv(self.segments_path, index=False)
-        if fileName != '':
-            self.mediaPlayer.setMedia(
-                    QMediaContent(QUrl.fromLocalFile(fileName)))
-            # self.playButton.setEnabled(True)
-        self.segments_path = "segment_labels/" + os.path.basename(fileName).split('.')[0] + ".csv"
-        self.segments = pd.read_csv(self.segments_path)
+        # self.segments.to_csv(self.segments_path, index=False)
         self.segment_counter = 0
+        self.simpleplay(self.segment_counter)
+        # if self.files[0] != '':
+        #     self.mediaPlayer.setMedia(
+        #             QMediaContent(QUrl.fromLocalFile(self.files[0])))
+            # self.playButton.setEnabled(True)
+        # self.segments_path = "segment_labels/" + os.path.basename(fileName).split('.')[0] + ".csv"
+        # self.segments = pd.read_csv(self.segments_path)
+        # self.segment_counter = 0
         # this is also pretty scuffed here
-        QTimer.singleShot(1000, lambda: self.playsegment(0))  # waits for this to finish until gui displayed
+        # QTimer.singleShot(1000, lambda: self.simpleplay(self.segment_counter))  # waits for this to finish until gui displayed
         self.segmentLabel.setStyleSheet("color:black")
-        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.segments) - 1))
+        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.files) - 1))
 
+    def saveFile(self):
+        self.df.to_csv(self.labels_path)
+        print("SUCCESSFULLY SAVED")
 
     def exitCall(self):
-        print('saving on exit')
-        # todo: make this path dynamic for whatevedr file
-        self.segments.to_csv(self.segments_path, index=False)
+        print('exiting')
+        # self.segments.to_csv(self.segments_path, index=False)
         sys.exit(app.exec_())
 
     def closeEvent(self, a):
@@ -236,36 +260,60 @@ class VideoWindow(QMainWindow):
         self.playButton.setEnabled(False)
         self.errorLabel.setText("Error: " + self.mediaPlayer.errorString())
 
-    def playsegment(self, index):
-        startframe = self.segments['start_frame'][index]
-        endframe = self.segments['end_frame'][index]
-        # arg is milliseconds (assuming video is run at 30 fps)
-        frames_to_millisecs = startframe // 30 * 1000
-        self.mediaPlayer.setPosition(frames_to_millisecs)
-        self.mediaPlayer.play()
-        while self.mediaPlayer.position() * 30 // 1000 < endframe:
-            print(self.mediaPlayer.position() * 30 // 1000)
-        self.mediaPlayer.pause()
+    def simpleplay(self, cnt):
+        if self.files[cnt] != '':
+            self.mediaPlayer.setMedia(
+                QMediaContent(QUrl.fromLocalFile(self.files[cnt])))
+            self.playButton.setEnabled(True)
+        # self.segments_path = "segment_labels/" + os.path.basename(fileName).split('.')[0] + ".csv"
+        # self.segments = pd.read_csv(self.segments_path)
+        # self.segment_counter = 0
+        # this is also pretty scuffed here
+        QTimer.singleShot(1000, lambda: self.mediaPlayer.play())
+
+    # def playsegment(self, index):
+    #     startframe = self.segments['start_frame'][index]
+    #     endframe = self.segments['end_frame'][index]
+    #     # arg is milliseconds (assuming video is run at 30 fps)
+    #     frames_to_millisecs = startframe // 30 * 1000
+    #     self.mediaPlayer.setPosition(frames_to_millisecs)
+    #     self.mediaPlayer.play()
+    #     while self.mediaPlayer.position() * 30 // 1000 < endframe:
+    #         print(self.mediaPlayer.position() * 30 // 1000)
+    #     self.mediaPlayer.pause()
+
+    def create_or_load_csv(self):
+        try:
+            self.df = pd.read_csv(self.labels_path)
+        except FileNotFoundError:
+            self.df = pd.DataFrame({"file": [os.path.basename(x) for x in self.files], "label": ["UNLABELED",]*len(self.files)})
+            self.df.to_csv(self.labels_path)
+
+        #logic to set segment_counter here so you can go back from where you left off
+        # NOTE: this assumes there is at least 1 unlabeled.
+        self.segment_counter = self.df.index[self.df.label == "UNLABELED"][0]
+        print("Starting at index: " + str(self.segment_counter))
 
     def goback(self):
         if self.segment_counter <= 0:
             print("CANNOT GO BACK")
             return
         self.segment_counter = self.segment_counter - 1
-        self.playsegment(self.segment_counter)
-        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.segments)-1))
+        # self.playsegment(self.segment_counter)
+        self.simpleplay(self.segment_counter)
+        self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.files)-1))
 
-    def on_click(self):
-        print('button hit')
-        startframe = self.segments['start_frame'][self.segment_counter]
-        endframe = self.segments['end_frame'][self.segment_counter]
-        # arg is milliseconds (assuming video is run at 30 fps)
-        frames_to_millisecs = startframe // 30 * 1000
-        self.mediaPlayer.setPosition(frames_to_millisecs)
-        self.mediaPlayer.play()
-        while self.mediaPlayer.position() * 30 // 1000 < endframe:
-            print(self.mediaPlayer.position() * 30 // 1000)
-        self.mediaPlayer.pause()
+    # def on_click(self):
+    #     print('button hit')
+    #     startframe = self.segments['start_frame'][self.segment_counter]
+    #     endframe = self.segments['end_frame'][self.segment_counter]
+    #     # arg is milliseconds (assuming video is run at 30 fps)
+    #     frames_to_millisecs = startframe // 30 * 1000
+    #     self.mediaPlayer.setPosition(frames_to_millisecs)
+    #     self.mediaPlayer.play()
+    #     while self.mediaPlayer.position() * 30 // 1000 < endframe:
+    #         print(self.mediaPlayer.position() * 30 // 1000)
+    #     self.mediaPlayer.pause()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
