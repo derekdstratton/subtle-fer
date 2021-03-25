@@ -4,7 +4,7 @@ import cv2
 # downloads a YouTube video
 def try_download(link):
     from pytube import YouTube
-    import demoji
+    # import demoji
     yt = YouTube(link)
 
     # Showing details
@@ -15,14 +15,18 @@ def try_download(link):
     # Getting the highest resolution possible
     ys = yt.streams.get_highest_resolution()
 
+    fp = open("pilot_videos/links.txt", "a")
+
     if not os.path.isfile(ys.default_filename):
         # Starting download
         print("Downloading...")
         # ys.download()
         name = ys.title.replace(" ", "_")
-        name = demoji.replace(name, "")
-        ys.download(output_path="videos", filename=name)
+        # name = demoji.replace(name, "")
+        ys.download(output_path="pilot_videos", filename=name)
         print("Download completed!!")
+        fp.write(link + "\n")
+        fp.close()
     else:
         print("File already exists")
     return ys.default_filename.replace(" ", "_")
