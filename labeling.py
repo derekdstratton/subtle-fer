@@ -3,43 +3,57 @@ import os
 import pandas as pd
 
 #https://pythonprogramminglanguage.com/pyqt5-video-widget/
-from PyQt5.QtCore import QDir, Qt, QUrl, QTimer, QPoint
+from PyQt5.QtCore import QDir, Qt, QUrl, QTimer, QPoint, QRect, QSize
 from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel,
                              QPushButton, QSizePolicy, QSlider, QStyle, QVBoxLayout, QWidget, QGridLayout)
 from PyQt5.QtWidgets import QMainWindow,QWidget, QPushButton, QAction
-from PyQt5.QtGui import QIcon, QPainter, QPen, QPaintDevice, QBrush, QPolygon
+from PyQt5.QtGui import QIcon, QPainter, QPen, QPaintDevice, QBrush, QPolygon, QImage
 import sys
 
 # kind of a hacky way, just put them in a list of strings
 emotions_string_list = []
 
-class VideoWidgetOverride(QVideoWidget):
-    def __init__(self):
-        super().__init__()
-        self.points = QPolygon()
+# class VideoWidgetOverride(QVideoWidget):
+#     def __init__(self):
+#         super().__init__()
+#         self.points = QPolygon()
+#         self.draw = False
+#         self.setMouseTracking(True)
+#
+#     def mousePressEvent(self, e):
+#         self.points << e.pos()
+#         self.draw = True
+#         self.update()
+#         # self.repaint()
+#
+#     def mouseMoveEvent(self, e):
+#         print(e.pos())
+#         if self.draw:
+#             self.points << e.pos()
+#             self.update()
+#             print(e.pos())
+#
+#     def mouseReleaseEvent(self, e):
+#         self.draw = False
+#
+#     def paintEvent(self, ev):
+#         # super().paintEvent(ev)
+#         qp = QPainter(self)
+#         qp.setRenderHint(QPainter.Antialiasing)
+#         pen = QPen(Qt.red, 5)
+#         brush = QBrush(Qt.red)
+#         qp.setPen(pen)
+#         qp.setBrush(brush)
+#         for i in range(self.points.count()):
+#             qp.drawEllipse(self.points.point(i), 5, 5)
+#         # https://stackoverflow.com/questions/4372195/cant-override-videowidget-paintevent-in-qt-c
+#         # self.update()
 
-    def mousePressEvent(self, e):
-        self.points << e.pos()
-        self.update()
-        # self.repaint()
-
-    def paintEvent(self, ev):
-        # super().paintEvent(ev)
-        qp = QPainter(self)
-        qp.setRenderHint(QPainter.Antialiasing)
-        pen = QPen(Qt.red, 5)
-        brush = QBrush(Qt.red)
-        qp.setPen(pen)
-        qp.setBrush(brush)
-        for i in range(self.points.count()):
-            qp.drawEllipse(self.points.point(i), 5, 5)
-        # https://stackoverflow.com/questions/4372195/cant-override-videowidget-paintevent-in-qt-c
-        # self.update()
-
+# https://doc.qt.io/qt-5/qtwidgets-widgets-scribble-example.html
 class Overlay(QWidget):
-    def __init__(self):
+    def __init__(self, x, y, width, height):
         super().__init__()
         # self.setAutoFillBackground(False)
         # self.setWindowFlags(Qt.FramelessWindowHint)
@@ -48,25 +62,67 @@ class Overlay(QWidget):
         self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setWindowOpacity(3)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.points = QPolygon()
+
+        self.setMouseTracking(True)
+        self.setGeometry(x, y, width, height)
+        self.im = QImage(self.width(), self.height(), QImage.Format_ARGB32)
+        print(self.width())
+        print(self.height())
+        self.im.fill(Qt.transparent)
+        self.update()
 
     def mousePressEvent(self, e):
-        self.points << e.pos()
-        self.update()
-        # self.repaint()
+        if e.button() == Qt.LeftButton:
+            self.lastPoint = e.pos()
+            self.scribbling = True
+
+    def mouseMoveEvent(self, e):
+        if e.buttons() & Qt.LeftButton and self.scribbling:
+            self.drawLineTo(e.pos())
+
+    def mouseReleaseEvent(self, e):
+        if e.button() == Qt.LeftButton and self.scribbling:
+            self.drawLineTo(e.pos())
+            self.scribbling = False
+
+    def drawLineTo(self, endPoint):
+        painter = QPainter(self.im)
+        myPenColor = Qt.red
+        myPenWidth = 20
+        painter.setPen(QPen(myPenColor, myPenWidth, Qt.SolidLine, Qt.RoundCap,Qt.RoundJoin))
+        painter.setOpacity(0.3)
+        painter.drawLine(self.lastPoint, endPoint)
+        modified = True
+
+        rad = int((myPenWidth / 2) + 2)
+        # self.update()
+        self.update(QRect(self.lastPoint, endPoint).normalized().adjusted(-rad, -rad, +rad, +rad))
+        self.lastPoint = endPoint
 
     def paintEvent(self, ev):
-        # super().paintEvent(ev)
         qp = QPainter(self)
-        qp.setRenderHint(QPainter.Antialiasing)
-        pen = QPen(Qt.red, 5)
-        brush = QBrush(Qt.red)
-        qp.setPen(pen)
-        qp.setBrush(brush)
-        for i in range(self.points.count()):
-            qp.drawEllipse(self.points.point(i), 5, 5)
-        # https://stackoverflow.com/questions/4372195/cant-override-videowidget-paintevent-in-qt-c
-        # self.update()
+        drect = ev.rect()
+        qp.drawImage(drect, self.im, drect)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_S:
+            self.im.save("LOL.jpg", "jpg")
+
+    # def paintEvent(self, ev):
+    #     # super().paintEvent(ev)
+    #     qp = QPainter(self)
+    #     qp.setRenderHint(QPainter.Antialiasing)
+    #     qp.setOpacity(0.2)
+    #     # pen = QPen(Qt.red, 5)
+    #     pen = QPen(Qt.NoPen)
+    #     brush = QBrush(Qt.red)#, Qt.Dense5Pattern)
+    #     qp.setPen(pen)
+    #     qp.setBrush(brush)
+    #     for i in range(self.points.count()):
+    #         qp.drawEllipse(self.points.point(i), 5, 5)
+    #         # qp.drawPoint(self.points.point(i))
+    #     # https://stackoverflow.com/questions/4372195/cant-override-videowidget-paintevent-in-qt-c
+    #     # self.update()
 
 class EmotionButton(QPushButton):
     def __init__(self, name, vidWindow, styleSheet=None):
@@ -487,15 +543,15 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     player = VideoWindow()
     player.resize(640, 480)
+    player.setFixedSize(QSize(1200, 1200)) # use a fixed size
     player.show()
 
-    paintOnMe = Overlay()
     playGeom = player.geometry()
     vidWidgGeom = player.video_widget.geometry()
-    xy = paintOnMe.mapToGlobal(QPoint(vidWidgGeom.x(), vidWidgGeom.y()))
+    xy = player.mapToGlobal(QPoint(vidWidgGeom.x(), vidWidgGeom.y()))
     print(xy)
 
-    paintOnMe.setGeometry(xy.x(), xy.y(), vidWidgGeom.width(), vidWidgGeom.height())
+    paintOnMe = Overlay(xy.x(), xy.y(), vidWidgGeom.width(), vidWidgGeom.height())
     # player.layout().addWidget(paintOnMe)
     paintOnMe.raise_()
     # player.show()
