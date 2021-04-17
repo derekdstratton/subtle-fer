@@ -543,7 +543,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     player = VideoWindow()
     player.resize(640, 480)
-    player.setFixedSize(QSize(1200, 1200)) # use a fixed size
+    player.setFixedSize(QSize(800, 800)) # use a fixed size
     player.show()
 
     playGeom = player.geometry()
@@ -551,6 +551,7 @@ if __name__ == '__main__':
     xy = player.mapToGlobal(QPoint(vidWidgGeom.x(), vidWidgGeom.y()))
     print(xy)
 
+    # todo: these x and y's are wrong until initialization I think
     paintOnMe = Overlay(xy.x(), xy.y(), vidWidgGeom.width(), vidWidgGeom.height())
     # player.layout().addWidget(paintOnMe)
     paintOnMe.raise_()
