@@ -56,20 +56,22 @@ class Overlay(QWidget):
     def __init__(self, x, y, width, height):
         super().__init__()
         # self.setAutoFillBackground(False)
-        # self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # self.setStyleSheet("background-color: transparent")
         # self.setStyleSheet("QWidget{background: #000000}")
+        # self.setWindowFlags(Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setWindowOpacity(3)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
         self.setMouseTracking(True)
-        self.setGeometry(x, y, width, height)
-        self.im = QImage(self.width(), self.height(), QImage.Format_ARGB32)
-        print(self.width())
-        print(self.height())
-        self.im.fill(Qt.transparent)
-        self.update()
+        # self.setGeometry(x, y, width, height)
+        # self.setFixedSize(width, height)
+        # self.im = QImage(self.width(), self.height(), QImage.Format_ARGB32)
+        # print(self.width())
+        # print(self.height())
+        # self.im.fill(Qt.transparent)
+        # self.update()
 
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -104,9 +106,21 @@ class Overlay(QWidget):
         drect = ev.rect()
         qp.drawImage(drect, self.im, drect)
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_S:
-            self.im.save("LOL.jpg", "jpg")
+    # def keyPressEvent(self, event):
+    #     if event.key() == Qt.Key_S:
+    #         self.im.save("LOL.jpg", "jpg")
+    #     elif event.key() == Qt.Key_C:
+    #         self.im.fill(Qt.transparent)
+    #         self.update()
+
+    def showEvent(self, event):
+        self.setGeometry(self.mainX, self.mainY, self.mainWid, self.mainHei)
+        self.setFixedSize(self.mainWid, self.mainHei)
+        self.im = QImage(self.width(), self.height(), QImage.Format_ARGB32)
+        print(self.width())
+        print(self.height())
+        self.im.fill(Qt.transparent)
+        self.update()
 
     # def paintEvent(self, ev):
     #     # super().paintEvent(ev)
@@ -167,6 +181,11 @@ class VideoWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super(VideoWindow, self).__init__(parent)
+
+        self.drawingRef = None
+
+        self.setWindowState(Qt.WindowActive)
+
         self.setWindowTitle("Emotion Segment Labeler")
 
         self.mediaPlayer = QMediaPlayer(None, QMediaPlayer.VideoSurface)
@@ -191,23 +210,29 @@ class VideoWindow(QMainWindow):
         self.back = QPushButton('back', self)
         self.back.clicked.connect(self.goback)
 
+        self.clear = QPushButton('clear', self)
+        self.clear.clicked.connect(self.clear_drawing)
+
         self.segmentLabel = QLabel("")
 
         self.errorLabel = QLabel()
         self.errorLabel.setSizePolicy(QSizePolicy.Preferred,
                 QSizePolicy.Maximum)
 
+        # removing these for now, since I have autosave, and it opens the 1 dir
+        # if you want to start over, just delete the labels.csv file.
+
         # Create new action
-        openAction = QAction(QIcon('open.png'), '&Open', self)
-        openAction.setShortcut('Ctrl+O')
-        openAction.setStatusTip('Open folder')
-        openAction.triggered.connect(self.openFile)
+        # openAction = QAction(QIcon('open.png'), '&Open', self)
+        # openAction.setShortcut('Ctrl+O')
+        # openAction.setStatusTip('Open folder')
+        # openAction.triggered.connect(self.openFile)
 
         # saving action
-        saveAction = QAction(QIcon('save.png'), '&Save', self)
-        saveAction.setShortcut('Ctrl+S')
-        saveAction.setStatusTip('Save labels')
-        saveAction.triggered.connect(self.saveFile)
+        # saveAction = QAction(QIcon('save.png'), '&Save', self)
+        # saveAction.setShortcut('Ctrl+S')
+        # saveAction.setStatusTip('Save labels')
+        # saveAction.triggered.connect(self.saveFile)
 
         # Create exit action
         # todo: link this to x button
@@ -220,8 +245,8 @@ class VideoWindow(QMainWindow):
         menuBar = self.menuBar()
         fileMenu = menuBar.addMenu('&File')
         #fileMenu.addAction(newAction)
-        fileMenu.addAction(openAction)
-        fileMenu.addAction(saveAction)
+        # fileMenu.addAction(openAction)
+        # fileMenu.addAction(saveAction)
         fileMenu.addAction(exitAction)
 
         # Create a widget for window contents
@@ -236,6 +261,7 @@ class VideoWindow(QMainWindow):
         controlLayout.addWidget(self.segmentLabel)
         controlLayout.addWidget(self.back)
         controlLayout.addWidget(self.replay)
+        controlLayout.addWidget(self.clear)
 
         layout = QVBoxLayout()
         layout.addWidget(self.video_widget)
@@ -452,7 +478,18 @@ class VideoWindow(QMainWindow):
         # self.segments = pd.read_csv(self.segments_path)
         # self.segment_counter = 0
         # this is also pretty scuffed here
-        QTimer.singleShot(1000, lambda: self.mediaPlayer.play())
+        QTimer.singleShot(1000, self.play_start_pause_end)
+        # QTimer.singleShot(1000, lambda: self.mediaPlayer.play())
+
+    # todo: this might work but it's blocking. not ideal!
+    def play_start_pause_end(self):
+        self.mediaPlayer.setPosition(0)
+        self.mediaPlayer.play()
+        QTimer.singleShot(self.mediaPlayer.duration(), lambda: self.mediaPlayer.pause())
+        # while self.mediaPlayer.state() == QMediaPlayer.PlayingState:
+        #     pass
+        # self.mediaPlayer.setPosition(self.mediaPlayer.position()-1)
+        # self.mediaPlayer.pause()
 
     # def playsegment(self, index):
     #     startframe = self.segments['start_frame'][index]
@@ -489,6 +526,10 @@ class VideoWindow(QMainWindow):
         self.simpleplay(self.segment_counter)
         self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.files)-1))
 
+    def clear_drawing(self):
+        self.drawingRef.im.fill(Qt.transparent)
+        self.drawingRef.update()
+
     def submit(self):
         print('submit pressed')
         global emotions_string_list
@@ -501,18 +542,37 @@ class VideoWindow(QMainWindow):
         print('submitting: ' + concatted)
         emotions_string_list = []
 
+        # slider bar
         self.df['intensity'][self.segment_counter] = self.slider_bar.value()
 
+        # process the overlay
+        base_no_ext = os.path.splitext(os.path.basename(self.files[self.segment_counter]))[0]
+        imgs_out = "image_masks"
+        if not os.path.exists(imgs_out):
+            os.mkdir(imgs_out)
+        self.drawingRef.im.save(os.path.join(imgs_out, base_no_ext + "_mask.jpg"), "jpg")
+        self.clear_drawing()
+
+        # save to file after every iteration
+        self.df.to_csv(self.labels_path)
+
         if self.segment_counter >= len(self.files) - 1:
-            print("YOURE FINISHED HERE: AUTOSAVING.")
+            print("YOURE FINISHED.")
             self.segmentLabel.setStyleSheet("color:green")
-            self.df.to_csv(self.labels_path)
             return
         self.segment_counter = self.segment_counter + 1
         self.segmentLabel.setText(
             str(self.segment_counter) + "/" + str(len(self.files) - 1))
         # self.vidWindow.playsegment(self.vidWindow.segment_counter)
         self.simpleplay(self.segment_counter)
+
+    def showEvent(self, ev):
+        print("POS" + str(self.mapToGlobal(self.video_widget.pos()).x()))
+        self.drawingRef.move(self.mapToGlobal(self.video_widget.pos()))
+
+    def moveEvent(self, ev):
+        self.drawingRef.move(self.mapToGlobal(self.video_widget.pos()))
+
     # def on_click(self):
     #     print('button hit')
     #     startframe = self.segments['start_frame'][self.segment_counter]
@@ -544,7 +604,7 @@ if __name__ == '__main__':
     player = VideoWindow()
     player.resize(640, 480)
     player.setFixedSize(QSize(800, 800)) # use a fixed size
-    player.show()
+    # player.show()
 
     playGeom = player.geometry()
     vidWidgGeom = player.video_widget.geometry()
@@ -556,8 +616,20 @@ if __name__ == '__main__':
     # player.layout().addWidget(paintOnMe)
     paintOnMe.raise_()
     # player.show()
-    paintOnMe.show()
 
+
+    player.drawingRef = paintOnMe
+    player.show()
+
+    playGeom = player.geometry()
+    vidWidgGeom = player.video_widget.geometry()
+    xy = player.mapToGlobal(QPoint(vidWidgGeom.x(), vidWidgGeom.y()))
+    print(xy)
+    paintOnMe.mainX = xy.x()
+    paintOnMe.mainY = xy.y()
+    paintOnMe.mainWid = vidWidgGeom.width()
+    paintOnMe.mainHei = vidWidgGeom.height()
+    paintOnMe.show()
     # app.exec_()
     # player.playsegment(1)
     # player.playsegment(0)
