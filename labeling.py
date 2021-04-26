@@ -319,36 +319,40 @@ class VideoWindow(QMainWindow):
         vbox1.addWidget(EmotionButton("Awkwardness", self, styleSheet="background-color: gray"))
         vbox1.addWidget(EmotionButton("Boredom", self, styleSheet="background-color: gray"))
         vbox1.addWidget(EmotionButton("Confusion", self, styleSheet="background-color: gray"))
-        vbox1.addWidget(EmotionButton("Contempt", self, styleSheet="background-color: gray"))
+
 
         vbox2 = QVBoxLayout()
+        vbox2.addWidget(EmotionButton("Contempt", self, styleSheet="background-color: gray"))
         vbox2.addWidget(EmotionButton("Contentment", self, styleSheet="background-color: gray"))
         vbox2.addWidget(EmotionButton("Disappointment", self, styleSheet="background-color: gray"))
         vbox2.addWidget(EmotionButton("Disgust", self, styleSheet="background-color: gray"))
         vbox2.addWidget(EmotionButton("Embarrassment", self, styleSheet="background-color: gray"))
-        vbox2.addWidget(EmotionButton("Excitement", self, styleSheet="background-color: gray"))
-        vbox2.addWidget(EmotionButton("Fear", self, styleSheet="background-color: gray"))
+
 
         vbox3 = QVBoxLayout()
+        vbox3.addWidget(EmotionButton("Excitement", self, styleSheet="background-color: gray"))
+        vbox3.addWidget(EmotionButton("Fear", self, styleSheet="background-color: gray"))
         vbox3.addWidget(EmotionButton("Guilt", self, styleSheet="background-color: gray"))
         vbox3.addWidget(EmotionButton("Happiness", self, styleSheet="background-color: gray"))
         vbox3.addWidget(EmotionButton("Jealousy", self, styleSheet="background-color: gray"))
-        vbox3.addWidget(EmotionButton("Love", self, styleSheet="background-color: gray"))
-        vbox3.addWidget(EmotionButton("Nervousness", self, styleSheet="background-color: gray"))
+
 
         vbox4 = QVBoxLayout()
+        vbox4.addWidget(EmotionButton("Love", self, styleSheet="background-color: gray"))
+        vbox4.addWidget(EmotionButton("Nervousness", self, styleSheet="background-color: gray"))
         vbox4.addWidget(EmotionButton("Neutral", self, styleSheet="background-color: gray"))
         vbox4.addWidget(EmotionButton("Pain", self, styleSheet="background-color: gray"))
         vbox4.addWidget(EmotionButton("Pride", self, styleSheet="background-color: gray"))
-        vbox4.addWidget(EmotionButton("Relief", self, styleSheet="background-color: gray"))
-        vbox4.addWidget(EmotionButton("Sadness", self, styleSheet="background-color: gray"))
+
 
         vbox5 = QVBoxLayout()
+        vbox5.addWidget(EmotionButton("Relief", self, styleSheet="background-color: gray"))
+        vbox5.addWidget(EmotionButton("Sadness", self, styleSheet="background-color: gray"))
         vbox5.addWidget(EmotionButton("Sexual Desire", self, styleSheet="background-color: gray"))
         vbox5.addWidget(EmotionButton("Surprise", self, styleSheet="background-color: gray"))
         vbox5.addWidget(EmotionButton("Tired", self, styleSheet="background-color: gray"))
-        vbox5.addSpacing(20)
-        vbox5.addWidget(EmotionButton("BAD CLIP", self))
+        # vbox5.addSpacing(20)
+        # vbox5.addWidget(EmotionButton("BAD CLIP", self))
 
         hbox.addLayout(vbox1)
         hbox.addLayout(vbox2)
