@@ -3,6 +3,7 @@ import os
 import pandas as pd
 
 #https://pythonprogramminglanguage.com/pyqt5-video-widget/
+from PyQt5 import QtCore
 from PyQt5.QtCore import QDir, Qt, QUrl, QTimer, QPoint, QRect, QSize
 from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 from PyQt5.QtMultimediaWidgets import QVideoWidget
@@ -14,6 +15,27 @@ import sys
 
 # kind of a hacky way, just put them in a list of strings
 emotions_string_list = []
+
+import functools
+
+# this is a clever solution to patch up my bad design
+# https://stackoverflow.com/questions/55553660/how-to-emit-custom-events-to-the-event-loop-in-pyqt
+@functools.lru_cache()
+class GlobalObject(QtCore.QObject):
+    def __init__(self):
+        super().__init__()
+        self._events = {}
+
+    def addEventListener(self, name, func):
+        if name not in self._events:
+            self._events[name] = [func]
+        else:
+            self._events[name].append(func)
+
+    def dispatchEvent(self, name):
+        functions = self._events.get(name, [])
+        for func in functions:
+            QtCore.QTimer.singleShot(0, func)
 
 # class VideoWidgetOverride(QVideoWidget):
 #     def __init__(self):
@@ -51,6 +73,14 @@ emotions_string_list = []
 #         # https://stackoverflow.com/questions/4372195/cant-override-videowidget-paintevent-in-qt-c
 #         # self.update()
 
+class DonePopup(QWidget):
+    def __init__(self):
+        QWidget.__init__(self)
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel("Congratulations! You've finished labeling. Please follow the submission instructions\nto send us your completed labels. This application is safe to close now."))
+        self.setLayout(hbox)
+
+
 # https://doc.qt.io/qt-5/qtwidgets-widgets-scribble-example.html
 class Overlay(QWidget):
     def __init__(self, x, y, width, height):
@@ -65,6 +95,8 @@ class Overlay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
         self.setMouseTracking(True)
+
+        self.hasBeenDrawnOn = False
         # self.setGeometry(x, y, width, height)
         # self.setFixedSize(width, height)
         # self.im = QImage(self.width(), self.height(), QImage.Format_ARGB32)
@@ -74,6 +106,7 @@ class Overlay(QWidget):
         # self.update()
 
     def mousePressEvent(self, e):
+        self.hasBeenDrawnOn = True
         if e.button() == Qt.LeftButton:
             self.lastPoint = e.pos()
             self.scribbling = True
@@ -90,7 +123,7 @@ class Overlay(QWidget):
     def drawLineTo(self, endPoint):
         painter = QPainter(self.im)
         myPenColor = Qt.red
-        myPenWidth = 20
+        myPenWidth = 5
         painter.setPen(QPen(myPenColor, myPenWidth, Qt.SolidLine, Qt.RoundCap,Qt.RoundJoin))
         painter.setOpacity(0.3)
         painter.drawLine(self.lastPoint, endPoint)
@@ -147,7 +180,10 @@ class EmotionButton(QPushButton):
         self.clicked.connect(self.emotion_button_click)
         self.vidWindow = vidWindow
 
-        self.vidWindow.submit_button.clicked.connect(self.pls)
+        # self.vidWindow.submit_button.clicked.connect(self.pls)
+        GlobalObject().addEventListener("success", self.pls)
+
+        self.vidWindow.back.clicked.connect(self.pls)
 
         # toggle
         # https://www.geeksforgeeks.org/pyqt5-toggle-button/
@@ -159,8 +195,10 @@ class EmotionButton(QPushButton):
         # TODO: label the data here
         if self.isChecked():
             emotions_string_list.append(self.name)
+            self.setStyleSheet("background-color: blue")
         else:
             emotions_string_list.remove(self.name)
+            self.setStyleSheet("background-color: gray")
 
         # self.vidWindow.df['label'][self.vidWindow.segment_counter] = self.name
         #
@@ -175,7 +213,9 @@ class EmotionButton(QPushButton):
         # self.vidWindow.simpleplay(self.vidWindow.segment_counter)
 
     def pls(self):
+        emotions_string_list.clear()
         self.setChecked(False)
+        self.setStyleSheet("background-color: gray")
 
 class VideoWindow(QMainWindow):
 
@@ -364,17 +404,40 @@ class VideoWindow(QMainWindow):
 
         hbox2 = QGridLayout() #not a horizontal box
 
-        self.slider_bar = QSlider(Qt.Horizontal)
-        self.slider_bar.setMinimum(1)
-        self.slider_bar.setMaximum(5)
-        self.slider_bar.setTickInterval(1)
-        self.slider_bar.setTickPosition(3)
-        hbox2.addWidget(self.slider_bar, 0, 0, 1, 5)
-        hbox2.addWidget(QLabel("Low"), 1, 0, 1, 1)
-        hbox2.addWidget(QLabel("High"), 1, 4, 1, 1, Qt.AlignRight)
+        self.intensity_bar = QSlider(Qt.Horizontal)
+        self.intensity_bar.setMinimum(0)
+        self.intensity_bar.setMaximum(5)
+        self.intensity_bar.setTickInterval(1)
+        self.intensity_bar.setTickPosition(3)
+        hbox2.addWidget(QLabel("Intensity"), 0, 0, 1, 1)
+        hbox2.addWidget(self.intensity_bar, 0, 1, 1, 5)
 
-        hbox2.addWidget(self.submit_button, 0, 5, 1, 1)
+        self.confidence_bar = QSlider(Qt.Horizontal)
+        self.confidence_bar.setMinimum(0)
+        self.confidence_bar.setMaximum(5)
+        self.confidence_bar.setTickInterval(1)
+        self.confidence_bar.setTickPosition(3)
+        hbox2.addWidget(QLabel("Confidence"), 1, 0, 1, 1)
+        hbox2.addWidget(self.confidence_bar, 1, 1, 1, 5)
+
+        hbox2.addWidget(QLabel("Not Set"), 2, 1, 1, 1)
+        hbox2.addWidget(QLabel("Low"), 2, 2, 1, 1)
+        hbox2.addWidget(QLabel("High"), 2, 5, 1, 1, Qt.AlignRight)
+
+        hbox2.addWidget(self.submit_button, 0, 6, 1, 3)
         layout.addLayout(hbox2)
+
+        # self.slider_bar = QSlider(Qt.Horizontal)
+        # self.slider_bar.setMinimum(1)
+        # self.slider_bar.setMaximum(5)
+        # self.slider_bar.setTickInterval(1)
+        # self.slider_bar.setTickPosition(3)
+        # hbox2.addWidget(self.slider_bar, 0, 0, 1, 5)
+        # hbox2.addWidget(QLabel("Low"), 1, 0, 1, 1)
+        # hbox2.addWidget(QLabel("High"), 1, 4, 1, 1, Qt.AlignRight)
+        #
+        # hbox2.addWidget(self.submit_button, 0, 5, 1, 1)
+        # layout.addLayout(hbox2)
 
         # layout.addWidget(EmotionButton("LOL"))
 
@@ -485,15 +548,15 @@ class VideoWindow(QMainWindow):
         QTimer.singleShot(1000, self.play_start_pause_end)
         # QTimer.singleShot(1000, lambda: self.mediaPlayer.play())
 
-    # todo: this might work but it's blocking. not ideal!
     def play_start_pause_end(self):
         self.mediaPlayer.setPosition(0)
         self.mediaPlayer.play()
-        QTimer.singleShot(self.mediaPlayer.duration(), lambda: self.mediaPlayer.pause())
-        # while self.mediaPlayer.state() == QMediaPlayer.PlayingState:
-        #     pass
-        # self.mediaPlayer.setPosition(self.mediaPlayer.position()-1)
-        # self.mediaPlayer.pause()
+        QTimer.singleShot(self.mediaPlayer.duration(), self.pause_after_playback)
+
+    def pause_after_playback(self):
+        self.mediaPlayer.pause()
+        # easiest thing to do is to pause on the very first frame for people to draw on
+        self.mediaPlayer.setPosition(0)
 
     # def playsegment(self, index):
     #     startframe = self.segments['start_frame'][index]
@@ -512,7 +575,8 @@ class VideoWindow(QMainWindow):
         except FileNotFoundError:
             self.df = pd.DataFrame({"file": [os.path.basename(x) for x in self.files],
                                     "label": ["UNLABELED",]*len(self.files),
-                                    "intensity": [-1,]*len(self.files)
+                                    "intensity": [-1,]*len(self.files),
+                                    "confidence": [-1, ] * len(self.files)
                                     })
             self.df.to_csv(self.labels_path)
 
@@ -529,8 +593,12 @@ class VideoWindow(QMainWindow):
         # self.playsegment(self.segment_counter)
         self.simpleplay(self.segment_counter)
         self.segmentLabel.setText(str(self.segment_counter) + "/" + str(len(self.files)-1))
+        self.intensity_bar.setValue(0)
+        self.confidence_bar.setValue(0)
+        self.clear_drawing()
 
     def clear_drawing(self):
+        self.drawingRef.hasBeenDrawnOn = False
         self.drawingRef.im.fill(Qt.transparent)
         self.drawingRef.update()
 
@@ -540,6 +608,17 @@ class VideoWindow(QMainWindow):
         if len(emotions_string_list) < 1:
             print('no emotions pressed')
             return
+        if self.intensity_bar.value() == 0:
+            print('no intesnity set')
+            return
+        if self.confidence_bar.value() == 0:
+            print('no confidence set')
+            return
+        if self.drawingRef.hasBeenDrawnOn == False:
+            print("need to draw on this")
+            return
+
+        GlobalObject().dispatchEvent("success")
 
         concatted = '_'.join(emotions_string_list)
         self.df['label'][self.segment_counter] = concatted
@@ -547,7 +626,11 @@ class VideoWindow(QMainWindow):
         emotions_string_list = []
 
         # slider bar
-        self.df['intensity'][self.segment_counter] = self.slider_bar.value()
+        self.df['intensity'][self.segment_counter] = self.intensity_bar.value()
+        self.df['confidence'][self.segment_counter] = self.confidence_bar.value()
+
+        self.intensity_bar.setValue(0)
+        self.confidence_bar.setValue(0)
 
         # process the overlay
         base_no_ext = os.path.splitext(os.path.basename(self.files[self.segment_counter]))[0]
@@ -563,6 +646,8 @@ class VideoWindow(QMainWindow):
         if self.segment_counter >= len(self.files) - 1:
             print("YOURE FINISHED.")
             self.segmentLabel.setStyleSheet("color:green")
+            self.thing = DonePopup()
+            self.thing.show()
             return
         self.segment_counter = self.segment_counter + 1
         self.segmentLabel.setText(

@@ -50,3 +50,33 @@ creates outputs in a `processed` directory.
 2. To load another video and segment, you can load the video from the `videos` folder.
 The segments file should have the same base name, and be located in the `segment_labels` 
 directory.
+   
+## making installation VM for labeling.py
+
+1. `pyinstaller labeling.py` creates a folder called `dist` which packages everything
+Copy and paste the pilot_segments folder into `dist/labeling`. Zip it and upload to the box to transport.
+   
+a. Note: MAKE SURE that labels.csv is NOT in the pilot_segments.
+
+2. Download a VM image of Linux Lite from: https://www.osboxes.org/linux-lite/ and 
+Virtualbox
+   
+3. Open Virtualbox, hit new. Put in the right options and import from hard disk,
+selecting the .vdi image (it's debian based)
+   
+4. Download the `labeling.zip` file and put it on the desktop for easy access
+
+5. Create an easy run script called `run_me.sh` that contains the following:
+```
+#!/bin/bash
+./labeling
+```
+
+6. Run the command `chmod +x run_me.sh` to make it clickable from the desktop
+
+7. Next, we need a GStreamer plugin to play the videos. https://gstreamer.freedesktop.org/documentation/installing/on-linux.html?gi-language=c
+
+8. In Virtualbox, export applicance. And go to expert mode and change the file
+extension to .ovf
+   
+9. 
