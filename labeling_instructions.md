@@ -17,6 +17,10 @@
    
 5. On the next screen, press import. 
 
+* Note: If you're a Mac user and you receive an error like `Kernel driver not installed
+  (rc=-1908)`, look [here](https://www.howtogeek.com/658047/how-to-fix-virtualboxs-%E2%80%9Ckernel-driver-not-installed-rc-1908-error/) 
+  for a fix.
+
 6. On the main VirtualBox screen, a new machine called `Labeling VM` should
 appear on the left pane. Double click here to run the virtual machine.
    
@@ -89,17 +93,26 @@ removes all of your labels for the previous clip, so you'll have to
    labels file called `labels.csv` and the images folder called `image masks`.
    Make sure those are both available. The `labels.csv` file is located in
    the `pilot_segments` folder in `labeling`, while `image masks` should be
-   visible in `labeling`.
+   visible in `labeling`. If you double-click on `image masks`, you should be able
+   to see the image masks for the faces that you creaed.
+   
+![](labeling_screenshots/labels_csv_loc.png)
    
 2. Right click on the `image masks` folder and select the option `Compress`.
 
+![](labeling_screenshots/image_masks_compress.png)
+
 3. Press create, and a file called `image masks.tar.gz` will be created.
+
+![](labeling_screenshots/create_tar_gz.png)
 
 4. Please send the files `labels.csv` and `image masks.tar.gz` as attachments
 of an email to `derekdstratton@gmail.com`. You can send this through the
 Virtual Machine's browser (it has Firefox available in the bottom left).
    
+![](labeling_screenshots/gmail.png)
+
 # Any Other Questions
 
-If you have any other questions or issues, send an email to
+If you have any other questions or issues, send an email to Derek at
 `derekdstratton@gmail.com` and I'll try to help.
